@@ -1,0 +1,795 @@
+==============================================================================
+INVENTARIO DE TABLAS SAS — repositorio alektebel/regllm
+Extraído con el compilador SAS (src/sas_logic_tree.py)
+Generado: 2026-07-20
+==============================================================================
+
+
+##############################################################################
+# PIPELINE: Sesión debug_lgd (debug_lgd)
+# Pipeline de depuración LGD: carga de ciclos, enriquecimiento EAD y suelos regulatorios (3 ficheros).
+# Ficheros: data/sas/sessions/debug_lgd/proj_01_carga_ciclos.sas, data/sas/sessions/debug_lgd/proj_02_enriquecimiento_ead.sas, data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas
+##############################################################################
+
+TABLA: MYLIB.CICLOS_RECUPERACION
+  rol: Fuente externa
+  entradas: (externa / semilla)
+  alimenta a: WORK.CICLOS_ACTIVOS
+  campos (9):
+    COLATERAL_TIPO
+    ESTADO_CICLO
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    OR_EAD
+    PD_ESTIMADA
+    RECUPERACION_TOTAL
+    SEGMENTO
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.CICLOS_ACTIVOS
+  rol: Derivada
+  definida en: data/sas/sessions/debug_lgd/proj_01_carga_ciclos.sas (SET)
+  entradas: MYLIB.CICLOS_RECUPERACION
+  alimenta a: WORK.CICLOS_EAD
+  filtro: WHERE ESTADO_CICLO NE 'CERRADO'
+  campos (9):
+    COLATERAL_TIPO
+    ESTADO_CICLO
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    OR_EAD
+    PD_ESTIMADA
+    RECUPERACION_TOTAL
+    SEGMENTO
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.CICLOS_EAD
+  rol: Derivada
+  definida en: data/sas/sessions/debug_lgd/proj_02_enriquecimiento_ead.sas (SET)
+  entradas: WORK.CICLOS_ACTIVOS
+  alimenta a: WORK.SUELOS_LGD
+  campos (11):
+    COLATERAL_TIPO
+    EAD                          [nuevo]  = OR_EAD + INTERESES_ACUMULADOS
+    ESTADO_CICLO
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    OR_EAD
+    OR_EAD_TIT                   [nuevo]  = OR_EAD * 2  |  OR_EAD
+    PD_ESTIMADA
+    RECUPERACION_TOTAL
+    SEGMENTO
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.SUELOS_LGD
+  rol: Derivada
+  definida en: data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas (SET)
+  entradas: WORK.CICLOS_EAD
+  alimenta a: WORK.NO_CONFORMES
+  campos (17):
+    COLATERAL_TIPO
+    EAD
+    ECL                          [nuevo]  = PD_ESTIMADA * LGD_CON_MOC * EAD
+    ESTADO_CICLO
+    INTERESES_ACUMULADOS
+    K_IRB                        [nuevo]  = SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5
+    LGD_CON_MOC                  [nuevo]  = LGD_ESTIMADA + MoC
+    LGD_ESTIMADA                 [nuevo]  = 0.30  |  0.45
+    LGD_REALIZADA                [nuevo]  = 1 - RECUPERACION_TOTAL / EAD
+    MOC                          [nuevo]  = 0.05 * LGD_ESTIMADA
+    OR_EAD
+    OR_EAD_TIT
+    PD_ESTIMADA                  [nuevo]  = 0.0005
+    RECUPERACION_TOTAL
+    RWA                          [nuevo]  = EAD * LGD_CON_MOC * 12.5 * K_IRB
+    SEGMENTO
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.NO_CONFORMES
+  rol: Final
+  definida en: data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas (SET)
+  entradas: WORK.SUELOS_LGD
+  alimenta a: (terminal)
+  campos (19):
+    COLATERAL_TIPO
+    EAD
+    ECL
+    ESTADO_CICLO
+    FLAG_NC                      [nuevo]  = 1
+    INTERESES_ACUMULADOS
+    K_IRB
+    LGD_CON_MOC
+    LGD_ESTIMADA
+    LGD_REALIZADA
+    MOC
+    MOTIVO                       [nuevo]  = 'Ventana observación < 5 años'
+    OR_EAD
+    OR_EAD_TIT
+    PD_ESTIMADA
+    RECUPERACION_TOTAL
+    RWA
+    SEGMENTO
+    VENTANA_OBSERVACION_YEARS
+
+RELACIONES ENTRE CAMPOS (20):
+  OR_EAD -> OR_EAD_TIT  [asigna]  paso work.ciclos_ead  expr: OR_EAD * 2
+  SEGMENTO -> OR_EAD_TIT  [condiciona]  paso work.ciclos_ead
+  INTERESES_ACUMULADOS -> EAD  [asigna]  paso work.ciclos_ead  expr: OR_EAD + INTERESES_ACUMULADOS
+  OR_EAD -> EAD  [asigna]  paso work.ciclos_ead  expr: OR_EAD + INTERESES_ACUMULADOS
+  COLATERAL_TIPO -> LGD_ESTIMADA  [condiciona]  paso work.suelos_lgd
+  SEGMENTO -> LGD_ESTIMADA  [condiciona]  paso work.suelos_lgd
+  LGD_ESTIMADA -> MOC  [asigna]  paso work.suelos_lgd  expr: 0.05 * LGD_ESTIMADA
+  MOC -> LGD_CON_MOC  [asigna]  paso work.suelos_lgd  expr: LGD_ESTIMADA + MoC
+  LGD_ESTIMADA -> LGD_CON_MOC  [asigna]  paso work.suelos_lgd  expr: LGD_ESTIMADA + MoC
+  LGD_CON_MOC -> ECL  [asigna]  paso work.suelos_lgd  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  PD_ESTIMADA -> ECL  [asigna]  paso work.suelos_lgd  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  EAD -> ECL  [asigna]  paso work.suelos_lgd  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  PD_ESTIMADA -> K_IRB  [asigna]  paso work.suelos_lgd  expr: SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5
+  K_IRB -> RWA  [asigna]  paso work.suelos_lgd  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  LGD_CON_MOC -> RWA  [asigna]  paso work.suelos_lgd  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  EAD -> RWA  [asigna]  paso work.suelos_lgd  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  EAD -> LGD_REALIZADA  [asigna]  paso work.suelos_lgd  expr: 1 - RECUPERACION_TOTAL / EAD
+  RECUPERACION_TOTAL -> LGD_REALIZADA  [asigna]  paso work.suelos_lgd  expr: 1 - RECUPERACION_TOTAL / EAD
+  VENTANA_OBSERVACION_YEARS -> FLAG_NC  [condiciona]  paso work.no_conformes
+  VENTANA_OBSERVACION_YEARS -> MOTIVO  [condiciona]  paso work.no_conformes
+
+##############################################################################
+# PIPELINE: Calibración LGD (sample) (sample_lgd)
+# Calibración LGD cartera retail/hipotecario: suelos, métricas por segmento, MoC, ECL y no conformes.
+# Ficheros: data/samples/sample_lgd.sas
+##############################################################################
+
+TABLA: MYLIB.CICLOS_RECUPERACION
+  rol: Fuente externa
+  entradas: (externa / semilla)
+  alimenta a: WORK.CICLOS
+  campos (11):
+    COLATERAL_TIPO
+    CURE_FLAG
+    DPDS
+    EAD
+    LGD_ESTIMADA
+    PD_ESTIMADA
+    PROVISION_PERIOD_MONTHS
+    SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.CICLOS
+  rol: Derivada
+  definida en: data/samples/sample_lgd.sas (SET)
+  entradas: MYLIB.CICLOS_RECUPERACION
+  alimenta a: WORK.LGD_CON_SUELOS
+  filtro: WHERE PROVISION_PERIOD_MONTHS >= 9
+  campos (11):
+    COLATERAL_TIPO
+    CURE_FLAG
+    DPDS
+    EAD
+    LGD_ESTIMADA
+    PD_ESTIMADA
+    PROVISION_PERIOD_MONTHS
+    SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.LGD_CON_SUELOS
+  rol: Derivada
+  definida en: data/samples/sample_lgd.sas (SET)
+  entradas: WORK.CICLOS
+  alimenta a: WORK.METRICAS_SEGMENTO, WORK.LGD_ENRIQUECIDA
+  campos (11):
+    COLATERAL_TIPO
+    CURE_FLAG
+    DPDS
+    EAD
+    LGD_ESTIMADA                 [nuevo]  = 0.30  |  0.45
+    PD_ESTIMADA
+    PROVISION_PERIOD_MONTHS
+    SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.METRICAS_SEGMENTO
+  rol: Derivada
+  definida en: data/samples/sample_lgd.sas (PROC SQL)
+  entradas: WORK.LGD_CON_SUELOS
+  alimenta a: WORK.LGD_ENRIQUECIDA
+  campos (16):
+    COLATERAL_TIPO
+    CURE_FLAG
+    DPDS
+    EAD
+    EAD_TOTAL                    [nuevo]  = SUM(EAD)
+    ECL_ESPERADO_SEGMENTO        [nuevo]  = SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)
+    LGD_ESTIMADA
+    LGD_MEDIA                    [nuevo]  = AVG(LGD_ESTIMADA)
+    N_OPERACIONES                [nuevo]  = COUNT(*)
+    PD_ESTIMADA
+    PD_MEDIA                     [nuevo]  = AVG(PD_ESTIMADA)
+    PROVISION_PERIOD_MONTHS
+    SEGMENTO                     [nuevo]  = SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.LGD_ENRIQUECIDA
+  rol: Derivada
+  definida en: data/samples/sample_lgd.sas (MERGE)
+  entradas: WORK.LGD_CON_SUELOS, WORK.METRICAS_SEGMENTO
+  alimenta a: WORK.ECL_CALCULO
+  claves BY: SEGMENTO
+  filtro: WHERE a
+  campos (20):
+    COLATERAL_TIPO
+    CURE_FLAG
+    DPDS
+    EAD
+    EAD_TOTAL
+    ECL_ESPERADO_SEGMENTO
+    LGD_CON_MOC                  [nuevo]  = LGD_ESTIMADA + MOC
+    LGD_DESVIACION               [nuevo]  = LGD_ESTIMADA - LGD_MEDIA
+    LGD_ESTIMADA
+    LGD_MEDIA
+    MOC                          [nuevo]  = 0.10 * LGD_DESVIACION  |  0
+    N_OPERACIONES
+    PD_ESTIMADA
+    PD_MEDIA
+    PESO_EAD                     [nuevo]  = EAD / EAD_TOTAL  |  0
+    PROVISION_PERIOD_MONTHS
+    SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.ECL_CALCULO
+  rol: Derivada
+  definida en: data/samples/sample_lgd.sas (SET)
+  entradas: WORK.LGD_ENRIQUECIDA
+  alimenta a: WORK.NO_CONFORMES
+  campos (26):
+    COLATERAL_TIPO
+    CURE_FLAG
+    CURE_RATE_AJUSTE             [nuevo]  = COALESCE(CURE_FLAG, 0) * 0.15
+    DPDS
+    EAD
+    EAD_TOTAL
+    ECL                          [nuevo]  = PD_ESTIMADA * LGD_CON_MOC * EAD
+    ECL_AJUSTADO                 [nuevo]  = ECL * (1 - CURE_RATE_AJUSTE)
+    ECL_ESPERADO_SEGMENTO
+    K_IRB                        [nuevo]  = SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5
+    LGD_CON_MOC
+    LGD_DESVIACION
+    LGD_ESTIMADA
+    LGD_FLOOR_APLICADO           [nuevo]  = MAX(LGD_CON_MOC, 0.30)  |  MAX(LGD_CON_MOC, 0.45)
+    LGD_MEDIA
+    MOC
+    N_OPERACIONES
+    PD_ESTIMADA                  [nuevo]  = 0.0003
+    PD_MEDIA
+    PESO_EAD
+    PROVISION_PERIOD_MONTHS
+    RWA                          [nuevo]  = EAD * LGD_CON_MOC * 12.5 * K_IRB
+    SEGMENTO
+    STAGE_IFRS9                  [nuevo]  = 2
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+TABLA: WORK.NO_CONFORMES
+  rol: Final
+  definida en: data/samples/sample_lgd.sas (SET)
+  entradas: WORK.ECL_CALCULO
+  alimenta a: (terminal)
+  filtro: WHERE VENTANA_CALIBRACION_YEARS < 7
+       OR VENTANA_OBSERVACION_YEARS < 5
+       OR (COLATERAL_TIPO = 'HIPOTECA' AND LGD_ESTIMADA < 0.30)
+       OR PD_ESTIMADA < 0.0003
+  campos (26):
+    COLATERAL_TIPO
+    CURE_FLAG
+    CURE_RATE_AJUSTE
+    DPDS
+    EAD
+    EAD_TOTAL
+    ECL
+    ECL_AJUSTADO
+    ECL_ESPERADO_SEGMENTO
+    K_IRB
+    LGD_CON_MOC
+    LGD_DESVIACION
+    LGD_ESTIMADA
+    LGD_FLOOR_APLICADO
+    LGD_MEDIA
+    MOC
+    N_OPERACIONES
+    PD_ESTIMADA
+    PD_MEDIA
+    PESO_EAD
+    PROVISION_PERIOD_MONTHS
+    RWA
+    SEGMENTO
+    STAGE_IFRS9
+    VENTANA_CALIBRACION_YEARS
+    VENTANA_OBSERVACION_YEARS
+
+RELACIONES ENTRE CAMPOS (34):
+  COLATERAL_TIPO -> LGD_ESTIMADA  [condiciona]  paso work.lgd_con_suelos
+  SEGMENTO -> LGD_ESTIMADA  [condiciona]  paso work.lgd_con_suelos
+  COUNT -> N_OPERACIONES  [asigna]  paso work.metricas_segmento  expr: COUNT(*)
+  EAD -> EAD_TOTAL  [asigna]  paso work.metricas_segmento  expr: SUM(EAD)
+  AVG -> LGD_MEDIA  [asigna]  paso work.metricas_segmento  expr: AVG(LGD_ESTIMADA)
+  LGD_ESTIMADA -> LGD_MEDIA  [asigna]  paso work.metricas_segmento  expr: AVG(LGD_ESTIMADA)
+  PD_ESTIMADA -> PD_MEDIA  [asigna]  paso work.metricas_segmento  expr: AVG(PD_ESTIMADA)
+  AVG -> PD_MEDIA  [asigna]  paso work.metricas_segmento  expr: AVG(PD_ESTIMADA)
+  EAD -> ECL_ESPERADO_SEGMENTO  [asigna]  paso work.metricas_segmento  expr: SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)
+  PD_ESTIMADA -> ECL_ESPERADO_SEGMENTO  [asigna]  paso work.metricas_segmento  expr: SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)
+  LGD_ESTIMADA -> ECL_ESPERADO_SEGMENTO  [asigna]  paso work.metricas_segmento  expr: SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)
+  EAD_TOTAL -> PESO_EAD  [asigna]  paso work.lgd_enriquecida  expr: EAD / EAD_TOTAL
+  EAD -> PESO_EAD  [asigna]  paso work.lgd_enriquecida  expr: EAD / EAD_TOTAL
+  EAD_TOTAL -> PESO_EAD  [condiciona]  paso work.lgd_enriquecida
+  LGD_MEDIA -> LGD_DESVIACION  [asigna]  paso work.lgd_enriquecida  expr: LGD_ESTIMADA - LGD_MEDIA
+  LGD_ESTIMADA -> LGD_DESVIACION  [asigna]  paso work.lgd_enriquecida  expr: LGD_ESTIMADA - LGD_MEDIA
+  LGD_DESVIACION -> MOC  [asigna]  paso work.lgd_enriquecida  expr: 0.10 * LGD_DESVIACION
+  LGD_DESVIACION -> MOC  [condiciona]  paso work.lgd_enriquecida
+  MOC -> LGD_CON_MOC  [asigna]  paso work.lgd_enriquecida  expr: LGD_ESTIMADA + MOC
+  LGD_ESTIMADA -> LGD_CON_MOC  [asigna]  paso work.lgd_enriquecida  expr: LGD_ESTIMADA + MOC
+  PD_ESTIMADA -> K_IRB  [asigna]  paso work.ecl_calculo  expr: SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5
+  K_IRB -> RWA  [asigna]  paso work.ecl_calculo  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  LGD_CON_MOC -> RWA  [asigna]  paso work.ecl_calculo  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  EAD -> RWA  [asigna]  paso work.ecl_calculo  expr: EAD * LGD_CON_MOC * 12.5 * K_IRB
+  LGD_CON_MOC -> ECL  [asigna]  paso work.ecl_calculo  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  PD_ESTIMADA -> ECL  [asigna]  paso work.ecl_calculo  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  EAD -> ECL  [asigna]  paso work.ecl_calculo  expr: PD_ESTIMADA * LGD_CON_MOC * EAD
+  CURE_FLAG -> CURE_RATE_AJUSTE  [asigna]  paso work.ecl_calculo  expr: COALESCE(CURE_FLAG, 0) * 0.15
+  CURE_RATE_AJUSTE -> ECL_AJUSTADO  [asigna]  paso work.ecl_calculo  expr: ECL * (1 - CURE_RATE_AJUSTE)
+  ECL -> ECL_AJUSTADO  [asigna]  paso work.ecl_calculo  expr: ECL * (1 - CURE_RATE_AJUSTE)
+  DPDS -> STAGE_IFRS9  [condiciona]  paso work.ecl_calculo
+  LGD_CON_MOC -> LGD_FLOOR_APLICADO  [asigna]  paso work.ecl_calculo  expr: MAX(LGD_CON_MOC, 0.30)
+  COLATERAL_TIPO -> LGD_FLOOR_APLICADO  [condiciona]  paso work.ecl_calculo
+  STAGE_IFRS9 -> LGD_FLOOR_APLICADO  [condiciona]  paso work.ecl_calculo
+
+##############################################################################
+# PIPELINE: Pipeline DQC ciclos_calibrados (dqc_stress)
+# Pipeline completo PD/LGD desde BASILEA en 7 capas — base de stress-test del agente DQC.
+# Ficheros: DQC/eval/sas/ciclos_calibrados_pipeline.sas
+##############################################################################
+
+TABLA: WORK.CICLOS_RAW
+  rol: Semilla (DATALINES)
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (DATALINES)
+  entradas: (externa / semilla)
+  alimenta a: WORK.STG_CICLOS
+  campos (27):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    ESTADO_CICLO
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    LGD_REALIZADA
+    MES_CICLO
+    PD_ESTIMADA
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+
+TABLA: WORK.CONTRATOS_RAW
+  rol: Semilla (DATALINES)
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (DATALINES)
+  entradas: (externa / semilla)
+  alimenta a: WORK.CICLOS_ENR
+  campos (4):
+    ENTIDAD_ORIGEN
+    ID_CONTRATO
+    ID_FUSION_FINAL
+    SW_FUSION
+
+TABLA: WORK.BASILEA_MENSUAL_RAW
+  rol: Semilla (DATALINES)
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (DATALINES)
+  entradas: (externa / semilla)
+  alimenta a: WORK.CICLOS_EAD
+  campos (6):
+    ID_CONTRATO
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    OR_DISBLE
+    OR_DISPTO
+    OR_EAD
+
+TABLA: WORK.COLATERALES_RAW
+  rol: Semilla (DATALINES)
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (DATALINES)
+  entradas: (externa / semilla)
+  alimenta a: WORK.CICLOS_EAD
+  campos (4):
+    HAIRCUT
+    ID_CONTRATO
+    VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL
+
+TABLA: WORK.STG_CICLOS
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (SET)
+  entradas: WORK.CICLOS_RAW
+  alimenta a: WORK.CICLOS_ENR
+  campos (27):
+    ADJUDICACION_FLAG            [nuevo]  = '0'
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR           [nuevo]  = COALESCE(ADJUDICACION_VALOR, 0)
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA        [nuevo]  = COALESCE(COSTE_TOTAL_ACUMULADA, 0)
+    CURE_FLAG
+    DPDS
+    ESTADO_CICLO
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA                 [nuevo]  = COALESCE(LGD_ESTIMADA, .)
+    LGD_REALIZADA
+    MES_CICLO
+    PD_ESTIMADA                  [nuevo]  = COALESCE(PD_ESTIMADA, .)
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA       [nuevo]  = COALESCE(RECUPERACION_ACUMULADA, 0)
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+
+TABLA: WORK.CICLOS_ENR
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (MERGE)
+  entradas: WORK.CONTRATOS_RAW, WORK.STG_CICLOS
+  alimenta a: WORK.CICLOS_EAD
+  claves BY: ID_CONTRATO
+  filtro: WHERE a
+  campos (30):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    LGD_REALIZADA
+    MES_CICLO
+    PD_ESTIMADA
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    SW_FUSION                    [nuevo]  = COALESCE(SW_FUSION, 0)
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+
+TABLA: WORK.CICLOS_EAD
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (PROC SQL)
+  entradas: WORK.BASILEA_MENSUAL_RAW, WORK.CICLOS_ENR, WORK.COLATERALES_RAW
+  alimenta a: WORK.PD_CAL
+  campos (37):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    HAIRCUT                      [nuevo]  = col.HAIRCUT
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    LGD_REALIZADA
+    MES_CICLO
+    OR_DISBLE                    [nuevo]  = b.OR_DISBLE
+    OR_DISPTO                    [nuevo]  = b.OR_DISPTO
+    OR_EAD                       [nuevo]  = b.OR_EAD
+    PD_ESTIMADA
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    SW_FUSION
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+    VALOR_COLATERAL              [nuevo]  = col.VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL      [nuevo]  = col.VALOR_COLATERAL_INICIAL
+
+TABLA: WORK.PD_CAL
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (SET)
+  entradas: WORK.CICLOS_EAD
+  alimenta a: WORK.LGD_CAL
+  campos (40):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    HAIRCUT
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    LGD_ESTIMADA
+    LGD_REALIZADA
+    MES_CICLO
+    OR_DISBLE
+    OR_DISPTO
+    OR_EAD
+    PD_DOWNTURN                  [nuevo]  = MIN(1, PD_ESTIMADA * 1.5)
+    PD_ESTIMADA
+    PD_FINAL                     [nuevo]  = MAX(PD_ESTIMADA, PD_SUELO)
+    PD_SUELO                     [nuevo]  = 0.0005  |  0.0003
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    SW_FUSION
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+    VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL
+
+TABLA: WORK.LGD_CAL
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (SET)
+  entradas: WORK.PD_CAL
+  alimenta a: WORK.EAD_CAL
+  campos (44):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    HAIRCUT
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    LGD_CON_MOC                  [nuevo]  = LGD_ESTIMADA + MOC
+    LGD_ESTIMADA                 [nuevo]  = 0.45
+    LGD_FINAL                    [nuevo]  = MAX(LGD_CON_MOC, LGD_SUELO)
+    LGD_REALIZADA
+    LGD_SUELO                    [nuevo]  = 0.30  |  0.45
+    MES_CICLO
+    MOC                          [nuevo]  = 0.05 * LGD_ESTIMADA
+    OR_DISBLE
+    OR_DISPTO
+    OR_EAD
+    PD_DOWNTURN
+    PD_ESTIMADA
+    PD_FINAL
+    PD_SUELO
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    SW_FUSION
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+    VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL
+
+TABLA: WORK.EAD_CAL
+  rol: Derivada
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (SET)
+  entradas: WORK.LGD_CAL
+  alimenta a: MYLIB.CICLOS_CALIBRADOS
+  campos (49):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    CCF_ESTIMADO                 [nuevo]  = 0.75
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    EAD                          [nuevo]  = EAD_TOTAL
+    EAD_BALANCE                  [nuevo]  = COALESCE(OR_DISPTO, SALDO_PENDIENTE)
+    EAD_FUERA_BALANCE            [nuevo]  = CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)
+    EAD_TOTAL                    [nuevo]  = EAD_BALANCE + EAD_FUERA_BALANCE
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    HAIRCUT
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    LGD_CON_MOC
+    LGD_ESTIMADA
+    LGD_FINAL
+    LGD_REALIZADA
+    LGD_SUELO
+    MES_CICLO
+    MOC
+    OR_DISBLE
+    OR_DISPTO
+    OR_EAD
+    PD_DOWNTURN
+    PD_ESTIMADA
+    PD_FINAL
+    PD_SUELO
+    PRODUCTO
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9
+    SW_FUSION
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+    VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL
+
+TABLA: MYLIB.CICLOS_CALIBRADOS
+  rol: Final
+  definida en: DQC/eval/sas/ciclos_calibrados_pipeline.sas (SET)
+  entradas: WORK.EAD_CAL
+  alimenta a: (terminal)
+  campos (54):
+    ADJUDICACION_FLAG
+    ADJUDICACION_TIPO
+    ADJUDICACION_VALOR
+    CALIBRATION_SEGMENT
+    CAUSA_DEFAULT
+    CCF_ESTIMADO
+    COLATERAL_TIPO
+    COSTE_TOTAL_ACUMULADA
+    CURE_FLAG
+    DPDS
+    EAD
+    EAD_BALANCE
+    EAD_FUERA_BALANCE
+    EAD_TOTAL
+    ECL                          [nuevo]  = PD_FINAL * LGD_FINAL * EAD_TOTAL
+    ENTIDAD_ORIGEN
+    ESTADO_CICLO
+    HAIRCUT
+    ID_CONTRATO
+    ID_CONTR_CICLO_LGD
+    ID_FCH_DATOS
+    ID_FUSION_FINAL
+    INTERESES_ACUMULADOS
+    K_IRB                        [nuevo]  = SQRT(PD_FINAL) * 0.06 + PD_FINAL * 0.5
+    LGD_CON_MOC
+    LGD_ESTIMADA
+    LGD_FINAL
+    LGD_REALIZADA
+    LGD_SUELO
+    MES_CICLO
+    MOC
+    M_VENCIMIENTO                [nuevo]  = 2.5  |  MIN(5, MAX(1, 3.0))
+    OR_DISBLE
+    OR_DISPTO
+    OR_EAD
+    PD_DOWNTURN
+    PD_ESTIMADA
+    PD_FINAL
+    PD_SUELO
+    PRODUCTO
+    PROVISION                    [nuevo]  = ECL
+    RATING_GRADO
+    RECUPERACION_ACUMULADA
+    RWA                          [nuevo]  = EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB
+    SALDO_PENDIENTE
+    SEGMENTO
+    STAGE_IFRS9                  [nuevo]  = 2
+    SW_FUSION
+    TASA_DESCUENTO
+    TERMINACION
+    TIPO_INTERES_ACTUAL
+    TIPO_INTERES_ORIGINAL
+    VALOR_COLATERAL
+    VALOR_COLATERAL_INICIAL
+
+RELACIONES ENTRE CAMPOS (34):
+  PD_ESTIMADA -> PD_ESTIMADA  [asigna]  paso work.stg_ciclos  expr: COALESCE(PD_ESTIMADA, .)
+  LGD_ESTIMADA -> LGD_ESTIMADA  [asigna]  paso work.stg_ciclos  expr: COALESCE(LGD_ESTIMADA, .)
+  ADJUDICACION_VALOR -> ADJUDICACION_VALOR  [asigna]  paso work.stg_ciclos  expr: COALESCE(ADJUDICACION_VALOR, 0)
+  RECUPERACION_ACUMULADA -> RECUPERACION_ACUMULADA  [asigna]  paso work.stg_ciclos  expr: COALESCE(RECUPERACION_ACUMULADA, 0)
+  COSTE_TOTAL_ACUMULADA -> COSTE_TOTAL_ACUMULADA  [asigna]  paso work.stg_ciclos  expr: COALESCE(COSTE_TOTAL_ACUMULADA, 0)
+  SW_FUSION -> SW_FUSION  [asigna]  paso work.ciclos_enr  expr: COALESCE(SW_FUSION, 0)
+  SEGMENTO -> PD_SUELO  [condiciona]  paso work.pd_cal
+  PD_SUELO -> PD_FINAL  [asigna]  paso work.pd_cal  expr: MAX(PD_ESTIMADA, PD_SUELO)
+  PD_ESTIMADA -> PD_FINAL  [asigna]  paso work.pd_cal  expr: MAX(PD_ESTIMADA, PD_SUELO)
+  PD_ESTIMADA -> PD_DOWNTURN  [asigna]  paso work.pd_cal  expr: MIN(1, PD_ESTIMADA * 1.5)
+  COLATERAL_TIPO -> LGD_SUELO  [condiciona]  paso work.lgd_cal
+  SEGMENTO -> LGD_SUELO  [condiciona]  paso work.lgd_cal
+  LGD_ESTIMADA -> MOC  [asigna]  paso work.lgd_cal  expr: 0.05 * LGD_ESTIMADA
+  MOC -> LGD_CON_MOC  [asigna]  paso work.lgd_cal  expr: LGD_ESTIMADA + MOC
+  LGD_ESTIMADA -> LGD_CON_MOC  [asigna]  paso work.lgd_cal  expr: LGD_ESTIMADA + MOC
+  LGD_CON_MOC -> LGD_FINAL  [asigna]  paso work.lgd_cal  expr: MAX(LGD_CON_MOC, LGD_SUELO)
+  LGD_SUELO -> LGD_FINAL  [asigna]  paso work.lgd_cal  expr: MAX(LGD_CON_MOC, LGD_SUELO)
+  SALDO_PENDIENTE -> EAD_BALANCE  [asigna]  paso work.ead_cal  expr: COALESCE(OR_DISPTO, SALDO_PENDIENTE)
+  OR_DISPTO -> EAD_BALANCE  [asigna]  paso work.ead_cal  expr: COALESCE(OR_DISPTO, SALDO_PENDIENTE)
+  CCF_ESTIMADO -> EAD_FUERA_BALANCE  [asigna]  paso work.ead_cal  expr: CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)
+  OR_DISBLE -> EAD_FUERA_BALANCE  [asigna]  paso work.ead_cal  expr: CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)
+  EAD_BALANCE -> EAD_TOTAL  [asigna]  paso work.ead_cal  expr: EAD_BALANCE + EAD_FUERA_BALANCE
+  EAD_FUERA_BALANCE -> EAD_TOTAL  [asigna]  paso work.ead_cal  expr: EAD_BALANCE + EAD_FUERA_BALANCE
+  EAD_TOTAL -> EAD  [asigna]  paso work.ead_cal  expr: EAD_TOTAL
+  PD_FINAL -> K_IRB  [asigna]  paso mylib.ciclos_calibrados  expr: SQRT(PD_FINAL) * 0.06 + PD_FINAL * 0.5
+  SEGMENTO -> M_VENCIMIENTO  [condiciona]  paso mylib.ciclos_calibrados
+  K_IRB -> RWA  [asigna]  paso mylib.ciclos_calibrados  expr: EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB
+  EAD_TOTAL -> RWA  [asigna]  paso mylib.ciclos_calibrados  expr: EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB
+  LGD_FINAL -> RWA  [asigna]  paso mylib.ciclos_calibrados  expr: EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB
+  PD_FINAL -> ECL  [asigna]  paso mylib.ciclos_calibrados  expr: PD_FINAL * LGD_FINAL * EAD_TOTAL
+  EAD_TOTAL -> ECL  [asigna]  paso mylib.ciclos_calibrados  expr: PD_FINAL * LGD_FINAL * EAD_TOTAL
+  LGD_FINAL -> ECL  [asigna]  paso mylib.ciclos_calibrados  expr: PD_FINAL * LGD_FINAL * EAD_TOTAL
+  ECL -> PROVISION  [asigna]  paso mylib.ciclos_calibrados  expr: ECL
+  DPDS -> STAGE_IFRS9  [condiciona]  paso mylib.ciclos_calibrados

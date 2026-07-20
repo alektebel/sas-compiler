@@ -1,0 +1,2849 @@
+{
+ "generated_from": "alektebel/regllm — src/sas_logic_tree.py (compilador SAS)",
+ "pipelines": [
+  {
+   "id": "debug_lgd",
+   "name": "Sesión debug_lgd",
+   "description": "Pipeline de depuración LGD: carga de ciclos, enriquecimiento EAD y suelos regulatorios (3 ficheros).",
+   "files": [
+    "data/sas/sessions/debug_lgd/proj_01_carga_ciclos.sas",
+    "data/sas/sessions/debug_lgd/proj_02_enriquecimiento_ead.sas",
+    "data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas"
+   ],
+   "tables": [
+    {
+     "name": "MYLIB.CICLOS_RECUPERACION",
+     "role": "source",
+     "libref": "MYLIB",
+     "defined_in": null,
+     "inputs": [],
+     "join": null,
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "COLATERAL_TIPO",
+      "ESTADO_CICLO",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "OR_EAD",
+      "PD_ESTIMADA",
+      "RECUPERACION_TOTAL",
+      "SEGMENTO",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.CICLOS_ACTIVOS",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/sas/sessions/debug_lgd/proj_01_carga_ciclos.sas",
+     "inputs": [
+      "MYLIB.CICLOS_RECUPERACION"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [
+      {
+       "kind": "WHERE",
+       "condition": "ESTADO_CICLO NE 'CERRADO'"
+      }
+     ],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "COLATERAL_TIPO",
+      "ESTADO_CICLO",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "OR_EAD",
+      "PD_ESTIMADA",
+      "RECUPERACION_TOTAL",
+      "SEGMENTO",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.CICLOS_EAD",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/sas/sessions/debug_lgd/proj_02_enriquecimiento_ead.sas",
+     "inputs": [
+      "WORK.CICLOS_ACTIVOS"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "SEGMENTO = 'CORP'"
+     ],
+     "new_fields": [
+      {
+       "var": "OR_EAD_TIT",
+       "expr": "OR_EAD * 2"
+      },
+      {
+       "var": "OR_EAD_TIT",
+       "expr": "OR_EAD"
+      },
+      {
+       "var": "EAD",
+       "expr": "OR_EAD + INTERESES_ACUMULADOS"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "EAD",
+      "ESTADO_CICLO",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "OR_EAD",
+      "OR_EAD_TIT",
+      "PD_ESTIMADA",
+      "RECUPERACION_TOTAL",
+      "SEGMENTO",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.SUELOS_LGD",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas",
+     "inputs": [
+      "WORK.CICLOS_EAD"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "COLATERAL_TIPO = 'HIPOTECA' AND LGD_ESTIMADA < 0.30",
+      "SEGMENTO = 'CORP' AND LGD_ESTIMADA < 0.45",
+      "PD_ESTIMADA < 0.0005"
+     ],
+     "new_fields": [
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "0.30"
+      },
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "0.45"
+      },
+      {
+       "var": "PD_ESTIMADA",
+       "expr": "0.0005"
+      },
+      {
+       "var": "MOC",
+       "expr": "0.05 * LGD_ESTIMADA"
+      },
+      {
+       "var": "LGD_CON_MOC",
+       "expr": "LGD_ESTIMADA + MoC"
+      },
+      {
+       "var": "ECL",
+       "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+      },
+      {
+       "var": "K_IRB",
+       "expr": "SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5"
+      },
+      {
+       "var": "RWA",
+       "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+      },
+      {
+       "var": "LGD_REALIZADA",
+       "expr": "1 - RECUPERACION_TOTAL / EAD"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "EAD",
+      "ECL",
+      "ESTADO_CICLO",
+      "INTERESES_ACUMULADOS",
+      "K_IRB",
+      "LGD_CON_MOC",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MOC",
+      "OR_EAD",
+      "OR_EAD_TIT",
+      "PD_ESTIMADA",
+      "RECUPERACION_TOTAL",
+      "RWA",
+      "SEGMENTO",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.NO_CONFORMES",
+     "role": "final",
+     "libref": "WORK",
+     "defined_in": "data/sas/sessions/debug_lgd/proj_03_suelos_lgd.sas",
+     "inputs": [
+      "WORK.SUELOS_LGD"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "VENTANA_OBSERVACION_YEARS < 5"
+     ],
+     "new_fields": [
+      {
+       "var": "FLAG_NC",
+       "expr": "1"
+      },
+      {
+       "var": "MOTIVO",
+       "expr": "'Ventana observación < 5 años'"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "EAD",
+      "ECL",
+      "ESTADO_CICLO",
+      "FLAG_NC",
+      "INTERESES_ACUMULADOS",
+      "K_IRB",
+      "LGD_CON_MOC",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MOC",
+      "MOTIVO",
+      "OR_EAD",
+      "OR_EAD_TIT",
+      "PD_ESTIMADA",
+      "RECUPERACION_TOTAL",
+      "RWA",
+      "SEGMENTO",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    }
+   ],
+   "table_edges": [
+    {
+     "source": "MYLIB.CICLOS_RECUPERACION",
+     "target": "WORK.CICLOS_ACTIVOS",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.CICLOS_ACTIVOS",
+     "target": "WORK.CICLOS_EAD",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.CICLOS_EAD",
+     "target": "WORK.SUELOS_LGD",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.SUELOS_LGD",
+     "target": "WORK.NO_CONFORMES",
+     "kind": "SET"
+    }
+   ],
+   "field_nodes": [
+    {
+     "id": "COLATERAL_TIPO",
+     "label": "COLATERAL_TIPO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "EAD",
+     "label": "EAD",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "ECL",
+     "label": "ECL",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "ESTADO_CICLO",
+     "label": "ESTADO_CICLO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "FLAG_NC",
+     "label": "FLAG_NC",
+     "kind": "computed",
+     "layer": 3,
+     "data_steps": [
+      "work.no_conformes"
+     ]
+    },
+    {
+     "id": "INTERESES_ACUMULADOS",
+     "label": "INTERESES_ACUMULADOS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "K_IRB",
+     "label": "K_IRB",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "LGD_CON_MOC",
+     "label": "LGD_CON_MOC",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "LGD_ESTIMADA",
+     "label": "LGD_ESTIMADA",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "LGD_REALIZADA",
+     "label": "LGD_REALIZADA",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "MOC",
+     "label": "MOC",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "MOTIVO",
+     "label": "MOTIVO",
+     "kind": "computed",
+     "layer": 3,
+     "data_steps": [
+      "work.no_conformes"
+     ]
+    },
+    {
+     "id": "OR_EAD",
+     "label": "OR_EAD",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "OR_EAD_TIT",
+     "label": "OR_EAD_TIT",
+     "kind": "computed",
+     "layer": 1,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "PD_ESTIMADA",
+     "label": "PD_ESTIMADA",
+     "kind": "input",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "RECUPERACION_TOTAL",
+     "label": "RECUPERACION_TOTAL",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "RWA",
+     "label": "RWA",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.suelos_lgd"
+     ]
+    },
+    {
+     "id": "SEGMENTO",
+     "label": "SEGMENTO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "VENTANA_OBSERVACION_YEARS",
+     "label": "VENTANA_OBSERVACION_YEARS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    }
+   ],
+   "field_edges": [
+    {
+     "source": "OR_EAD",
+     "target": "OR_EAD_TIT",
+     "kind": "assigns",
+     "data_step": "work.ciclos_ead",
+     "expr": "OR_EAD * 2"
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "OR_EAD_TIT",
+     "kind": "conditions",
+     "data_step": "work.ciclos_ead",
+     "expr": ""
+    },
+    {
+     "source": "INTERESES_ACUMULADOS",
+     "target": "EAD",
+     "kind": "assigns",
+     "data_step": "work.ciclos_ead",
+     "expr": "OR_EAD + INTERESES_ACUMULADOS"
+    },
+    {
+     "source": "OR_EAD",
+     "target": "EAD",
+     "kind": "assigns",
+     "data_step": "work.ciclos_ead",
+     "expr": "OR_EAD + INTERESES_ACUMULADOS"
+    },
+    {
+     "source": "COLATERAL_TIPO",
+     "target": "LGD_ESTIMADA",
+     "kind": "conditions",
+     "data_step": "work.suelos_lgd",
+     "expr": ""
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "LGD_ESTIMADA",
+     "kind": "conditions",
+     "data_step": "work.suelos_lgd",
+     "expr": ""
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "MOC",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "0.05 * LGD_ESTIMADA"
+    },
+    {
+     "source": "MOC",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "LGD_ESTIMADA + MoC"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "LGD_ESTIMADA + MoC"
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "EAD",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "K_IRB",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5"
+    },
+    {
+     "source": "K_IRB",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "EAD",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "EAD",
+     "target": "LGD_REALIZADA",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "1 - RECUPERACION_TOTAL / EAD"
+    },
+    {
+     "source": "RECUPERACION_TOTAL",
+     "target": "LGD_REALIZADA",
+     "kind": "assigns",
+     "data_step": "work.suelos_lgd",
+     "expr": "1 - RECUPERACION_TOTAL / EAD"
+    },
+    {
+     "source": "VENTANA_OBSERVACION_YEARS",
+     "target": "FLAG_NC",
+     "kind": "conditions",
+     "data_step": "work.no_conformes",
+     "expr": ""
+    },
+    {
+     "source": "VENTANA_OBSERVACION_YEARS",
+     "target": "MOTIVO",
+     "kind": "conditions",
+     "data_step": "work.no_conformes",
+     "expr": ""
+    }
+   ],
+   "data_steps": [
+    "work.ciclos_activos",
+    "work.ciclos_ead",
+    "work.suelos_lgd",
+    "work.no_conformes"
+   ]
+  },
+  {
+   "id": "sample_lgd",
+   "name": "Calibración LGD (sample)",
+   "description": "Calibración LGD cartera retail/hipotecario: suelos, métricas por segmento, MoC, ECL y no conformes.",
+   "files": [
+    "data/samples/sample_lgd.sas"
+   ],
+   "tables": [
+    {
+     "name": "MYLIB.CICLOS_RECUPERACION",
+     "role": "source",
+     "libref": "MYLIB",
+     "defined_in": null,
+     "inputs": [],
+     "join": null,
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "LGD_ESTIMADA",
+      "PD_ESTIMADA",
+      "PROVISION_PERIOD_MONTHS",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.CICLOS",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "MYLIB.CICLOS_RECUPERACION"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [
+      {
+       "kind": "WHERE",
+       "condition": "PROVISION_PERIOD_MONTHS >= 9"
+      }
+     ],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "LGD_ESTIMADA",
+      "PD_ESTIMADA",
+      "PROVISION_PERIOD_MONTHS",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.LGD_CON_SUELOS",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "WORK.CICLOS"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "COLATERAL_TIPO = 'HIPOTECA'",
+      "LGD_ESTIMADA < 0.30",
+      "SEGMENTO = 'CORP' AND LGD_ESTIMADA < 0.45",
+      "COLATERAL_TIPO = 'NINGUNA' AND SEGMENTO = 'RETAIL'"
+     ],
+     "new_fields": [
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "0.30"
+      },
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "0.45"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "LGD_ESTIMADA",
+      "PD_ESTIMADA",
+      "PROVISION_PERIOD_MONTHS",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.METRICAS_SEGMENTO",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "WORK.LGD_CON_SUELOS"
+     ],
+     "join": "PROC SQL",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [
+      {
+       "var": "SEGMENTO",
+       "expr": "SEGMENTO"
+      },
+      {
+       "var": "N_OPERACIONES",
+       "expr": "COUNT(*)"
+      },
+      {
+       "var": "EAD_TOTAL",
+       "expr": "SUM(EAD)"
+      },
+      {
+       "var": "LGD_MEDIA",
+       "expr": "AVG(LGD_ESTIMADA)"
+      },
+      {
+       "var": "PD_MEDIA",
+       "expr": "AVG(PD_ESTIMADA)"
+      },
+      {
+       "var": "ECL_ESPERADO_SEGMENTO",
+       "expr": "SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "EAD_TOTAL",
+      "ECL_ESPERADO_SEGMENTO",
+      "LGD_ESTIMADA",
+      "LGD_MEDIA",
+      "N_OPERACIONES",
+      "PD_ESTIMADA",
+      "PD_MEDIA",
+      "PROVISION_PERIOD_MONTHS",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.LGD_ENRIQUECIDA",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "WORK.LGD_CON_SUELOS",
+      "WORK.METRICAS_SEGMENTO"
+     ],
+     "join": "MERGE",
+     "by_keys": [
+      "SEGMENTO"
+     ],
+     "filters": [
+      {
+       "kind": "WHERE",
+       "condition": "a"
+      }
+     ],
+     "conditions": [
+      "EAD_TOTAL > 0",
+      "LGD_DESVIACION > 0"
+     ],
+     "new_fields": [
+      {
+       "var": "PESO_EAD",
+       "expr": "EAD / EAD_TOTAL"
+      },
+      {
+       "var": "PESO_EAD",
+       "expr": "0"
+      },
+      {
+       "var": "LGD_DESVIACION",
+       "expr": "LGD_ESTIMADA - LGD_MEDIA"
+      },
+      {
+       "var": "MOC",
+       "expr": "0.10 * LGD_DESVIACION"
+      },
+      {
+       "var": "MOC",
+       "expr": "0"
+      },
+      {
+       "var": "LGD_CON_MOC",
+       "expr": "LGD_ESTIMADA + MOC"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "EAD_TOTAL",
+      "ECL_ESPERADO_SEGMENTO",
+      "LGD_CON_MOC",
+      "LGD_DESVIACION",
+      "LGD_ESTIMADA",
+      "LGD_MEDIA",
+      "MOC",
+      "N_OPERACIONES",
+      "PD_ESTIMADA",
+      "PD_MEDIA",
+      "PESO_EAD",
+      "PROVISION_PERIOD_MONTHS",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.ECL_CALCULO",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "WORK.LGD_ENRIQUECIDA"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "PD_ESTIMADA < 0.0003",
+      "DPDS >= 30 AND STAGE_IFRS9 = 1",
+      "COLATERAL_TIPO = 'HIPOTECA'",
+      "STAGE_IFRS9 = 3"
+     ],
+     "new_fields": [
+      {
+       "var": "PD_ESTIMADA",
+       "expr": "0.0003"
+      },
+      {
+       "var": "K_IRB",
+       "expr": "SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5"
+      },
+      {
+       "var": "RWA",
+       "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+      },
+      {
+       "var": "ECL",
+       "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+      },
+      {
+       "var": "CURE_RATE_AJUSTE",
+       "expr": "COALESCE(CURE_FLAG, 0) * 0.15"
+      },
+      {
+       "var": "ECL_AJUSTADO",
+       "expr": "ECL * (1 - CURE_RATE_AJUSTE)"
+      },
+      {
+       "var": "STAGE_IFRS9",
+       "expr": "2"
+      },
+      {
+       "var": "LGD_FLOOR_APLICADO",
+       "expr": "MAX(LGD_CON_MOC, 0.30)"
+      },
+      {
+       "var": "LGD_FLOOR_APLICADO",
+       "expr": "MAX(LGD_CON_MOC, 0.45)"
+      }
+     ],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "CURE_RATE_AJUSTE",
+      "DPDS",
+      "EAD",
+      "EAD_TOTAL",
+      "ECL",
+      "ECL_AJUSTADO",
+      "ECL_ESPERADO_SEGMENTO",
+      "K_IRB",
+      "LGD_CON_MOC",
+      "LGD_DESVIACION",
+      "LGD_ESTIMADA",
+      "LGD_FLOOR_APLICADO",
+      "LGD_MEDIA",
+      "MOC",
+      "N_OPERACIONES",
+      "PD_ESTIMADA",
+      "PD_MEDIA",
+      "PESO_EAD",
+      "PROVISION_PERIOD_MONTHS",
+      "RWA",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.NO_CONFORMES",
+     "role": "final",
+     "libref": "WORK",
+     "defined_in": "data/samples/sample_lgd.sas",
+     "inputs": [
+      "WORK.ECL_CALCULO"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [
+      {
+       "kind": "WHERE",
+       "condition": "VENTANA_CALIBRACION_YEARS < 7\n       OR VENTANA_OBSERVACION_YEARS < 5\n       OR (COLATERAL_TIPO = 'HIPOTECA' AND LGD_ESTIMADA < 0.30)\n       OR PD_ESTIMADA < 0.0003"
+      }
+     ],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "COLATERAL_TIPO",
+      "CURE_FLAG",
+      "CURE_RATE_AJUSTE",
+      "DPDS",
+      "EAD",
+      "EAD_TOTAL",
+      "ECL",
+      "ECL_AJUSTADO",
+      "ECL_ESPERADO_SEGMENTO",
+      "K_IRB",
+      "LGD_CON_MOC",
+      "LGD_DESVIACION",
+      "LGD_ESTIMADA",
+      "LGD_FLOOR_APLICADO",
+      "LGD_MEDIA",
+      "MOC",
+      "N_OPERACIONES",
+      "PD_ESTIMADA",
+      "PD_MEDIA",
+      "PESO_EAD",
+      "PROVISION_PERIOD_MONTHS",
+      "RWA",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "VENTANA_CALIBRACION_YEARS",
+      "VENTANA_OBSERVACION_YEARS"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    }
+   ],
+   "table_edges": [
+    {
+     "source": "MYLIB.CICLOS_RECUPERACION",
+     "target": "WORK.CICLOS",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.CICLOS",
+     "target": "WORK.LGD_CON_SUELOS",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.LGD_CON_SUELOS",
+     "target": "WORK.METRICAS_SEGMENTO",
+     "kind": "PROC SQL"
+    },
+    {
+     "source": "WORK.LGD_CON_SUELOS",
+     "target": "WORK.LGD_ENRIQUECIDA",
+     "kind": "MERGE"
+    },
+    {
+     "source": "WORK.METRICAS_SEGMENTO",
+     "target": "WORK.LGD_ENRIQUECIDA",
+     "kind": "MERGE"
+    },
+    {
+     "source": "WORK.LGD_ENRIQUECIDA",
+     "target": "WORK.ECL_CALCULO",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.ECL_CALCULO",
+     "target": "WORK.NO_CONFORMES",
+     "kind": "SET"
+    }
+   ],
+   "field_nodes": [
+    {
+     "id": "A",
+     "label": "A",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "AVG",
+     "label": "AVG",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "COLATERAL_TIPO",
+     "label": "COLATERAL_TIPO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "COUNT",
+     "label": "COUNT",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "CURE_FLAG",
+     "label": "CURE_FLAG",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "CURE_RATE_AJUSTE",
+     "label": "CURE_RATE_AJUSTE",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "DPDS",
+     "label": "DPDS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "EAD",
+     "label": "EAD",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "EAD_TOTAL",
+     "label": "EAD_TOTAL",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "ECL",
+     "label": "ECL",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "ECL_AJUSTADO",
+     "label": "ECL_AJUSTADO",
+     "kind": "computed",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "ECL_ESPERADO_SEGMENTO",
+     "label": "ECL_ESPERADO_SEGMENTO",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "K_IRB",
+     "label": "K_IRB",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "LGD_CON_MOC",
+     "label": "LGD_CON_MOC",
+     "kind": "modified",
+     "layer": 3,
+     "data_steps": [
+      "work.lgd_enriquecida"
+     ]
+    },
+    {
+     "id": "LGD_DESVIACION",
+     "label": "LGD_DESVIACION",
+     "kind": "modified",
+     "layer": 3,
+     "data_steps": [
+      "work.lgd_enriquecida"
+     ]
+    },
+    {
+     "id": "LGD_ESTIMADA",
+     "label": "LGD_ESTIMADA",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.lgd_con_suelos"
+     ]
+    },
+    {
+     "id": "LGD_FLOOR_APLICADO",
+     "label": "LGD_FLOOR_APLICADO",
+     "kind": "computed",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "LGD_MEDIA",
+     "label": "LGD_MEDIA",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "MOC",
+     "label": "MOC",
+     "kind": "modified",
+     "layer": 3,
+     "data_steps": [
+      "work.lgd_enriquecida"
+     ]
+    },
+    {
+     "id": "N_OPERACIONES",
+     "label": "N_OPERACIONES",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "PD_ESTIMADA",
+     "label": "PD_ESTIMADA",
+     "kind": "input",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "PD_MEDIA",
+     "label": "PD_MEDIA",
+     "kind": "computed",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "PESO_EAD",
+     "label": "PESO_EAD",
+     "kind": "computed",
+     "layer": 3,
+     "data_steps": [
+      "work.lgd_enriquecida"
+     ]
+    },
+    {
+     "id": "PROVISION_PERIOD_MONTHS",
+     "label": "PROVISION_PERIOD_MONTHS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "RWA",
+     "label": "RWA",
+     "kind": "computed",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "SEGMENTO",
+     "label": "SEGMENTO",
+     "kind": "input",
+     "layer": 2,
+     "data_steps": [
+      "work.metricas_segmento"
+     ]
+    },
+    {
+     "id": "STAGE_IFRS9",
+     "label": "STAGE_IFRS9",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.ecl_calculo"
+     ]
+    },
+    {
+     "id": "VENTANA_CALIBRACION_YEARS",
+     "label": "VENTANA_CALIBRACION_YEARS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "VENTANA_OBSERVACION_YEARS",
+     "label": "VENTANA_OBSERVACION_YEARS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    }
+   ],
+   "field_edges": [
+    {
+     "source": "COLATERAL_TIPO",
+     "target": "LGD_ESTIMADA",
+     "kind": "conditions",
+     "data_step": "work.lgd_con_suelos",
+     "expr": ""
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "LGD_ESTIMADA",
+     "kind": "conditions",
+     "data_step": "work.lgd_con_suelos",
+     "expr": ""
+    },
+    {
+     "source": "COUNT",
+     "target": "N_OPERACIONES",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "COUNT(*)"
+    },
+    {
+     "source": "EAD",
+     "target": "EAD_TOTAL",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "SUM(EAD)"
+    },
+    {
+     "source": "AVG",
+     "target": "LGD_MEDIA",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "AVG(LGD_ESTIMADA)"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_MEDIA",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "AVG(LGD_ESTIMADA)"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "PD_MEDIA",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "AVG(PD_ESTIMADA)"
+    },
+    {
+     "source": "AVG",
+     "target": "PD_MEDIA",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "AVG(PD_ESTIMADA)"
+    },
+    {
+     "source": "EAD",
+     "target": "ECL_ESPERADO_SEGMENTO",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "ECL_ESPERADO_SEGMENTO",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "ECL_ESPERADO_SEGMENTO",
+     "kind": "assigns",
+     "data_step": "work.metricas_segmento",
+     "expr": "SUM(EAD * LGD_ESTIMADA * PD_ESTIMADA)"
+    },
+    {
+     "source": "EAD_TOTAL",
+     "target": "PESO_EAD",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "EAD / EAD_TOTAL"
+    },
+    {
+     "source": "EAD",
+     "target": "PESO_EAD",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "EAD / EAD_TOTAL"
+    },
+    {
+     "source": "EAD_TOTAL",
+     "target": "PESO_EAD",
+     "kind": "conditions",
+     "data_step": "work.lgd_enriquecida",
+     "expr": ""
+    },
+    {
+     "source": "LGD_MEDIA",
+     "target": "LGD_DESVIACION",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "LGD_ESTIMADA - LGD_MEDIA"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_DESVIACION",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "LGD_ESTIMADA - LGD_MEDIA"
+    },
+    {
+     "source": "LGD_DESVIACION",
+     "target": "MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "0.10 * LGD_DESVIACION"
+    },
+    {
+     "source": "LGD_DESVIACION",
+     "target": "MOC",
+     "kind": "conditions",
+     "data_step": "work.lgd_enriquecida",
+     "expr": ""
+    },
+    {
+     "source": "MOC",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "LGD_ESTIMADA + MOC"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_enriquecida",
+     "expr": "LGD_ESTIMADA + MOC"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "K_IRB",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "SQRT(PD_ESTIMADA) * 0.06 + PD_ESTIMADA * 0.5"
+    },
+    {
+     "source": "K_IRB",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "EAD",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "EAD * LGD_CON_MOC * 12.5 * K_IRB"
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "EAD",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "PD_ESTIMADA * LGD_CON_MOC * EAD"
+    },
+    {
+     "source": "CURE_FLAG",
+     "target": "CURE_RATE_AJUSTE",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "COALESCE(CURE_FLAG, 0) * 0.15"
+    },
+    {
+     "source": "CURE_RATE_AJUSTE",
+     "target": "ECL_AJUSTADO",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "ECL * (1 - CURE_RATE_AJUSTE)"
+    },
+    {
+     "source": "ECL",
+     "target": "ECL_AJUSTADO",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "ECL * (1 - CURE_RATE_AJUSTE)"
+    },
+    {
+     "source": "DPDS",
+     "target": "STAGE_IFRS9",
+     "kind": "conditions",
+     "data_step": "work.ecl_calculo",
+     "expr": ""
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "LGD_FLOOR_APLICADO",
+     "kind": "assigns",
+     "data_step": "work.ecl_calculo",
+     "expr": "MAX(LGD_CON_MOC, 0.30)"
+    },
+    {
+     "source": "COLATERAL_TIPO",
+     "target": "LGD_FLOOR_APLICADO",
+     "kind": "conditions",
+     "data_step": "work.ecl_calculo",
+     "expr": ""
+    },
+    {
+     "source": "STAGE_IFRS9",
+     "target": "LGD_FLOOR_APLICADO",
+     "kind": "conditions",
+     "data_step": "work.ecl_calculo",
+     "expr": ""
+    }
+   ],
+   "data_steps": [
+    "work.ciclos",
+    "work.lgd_con_suelos",
+    "work.metricas_segmento",
+    "work.lgd_enriquecida",
+    "work.ecl_calculo",
+    "work.no_conformes"
+   ]
+  },
+  {
+   "id": "dqc_stress",
+   "name": "Pipeline DQC ciclos_calibrados",
+   "description": "Pipeline completo PD/LGD desde BASILEA en 7 capas — base de stress-test del agente DQC.",
+   "files": [
+    "DQC/eval/sas/ciclos_calibrados_pipeline.sas"
+   ],
+   "tables": [
+    {
+     "name": "WORK.CICLOS_RAW",
+     "role": "seed",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [],
+     "join": "DATALINES",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ESTADO_CICLO",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MES_CICLO",
+      "PD_ESTIMADA",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL"
+     ],
+     "n_datalines": 5,
+     "comment": "",
+     "datalines_fields": [
+      "ID_CONTR_CICLO_LGD",
+      "ID_CONTRATO",
+      "SEGMENTO",
+      "CALIBRATION_SEGMENT",
+      "PRODUCTO",
+      "TERMINACION",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "MES_CICLO",
+      "RATING_GRADO",
+      "DPDS",
+      "STAGE_IFRS9",
+      "CURE_FLAG",
+      "PD_ESTIMADA",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "SALDO_PENDIENTE",
+      "TIPO_INTERES_ORIGINAL",
+      "TIPO_INTERES_ACTUAL",
+      "INTERESES_ACUMULADOS",
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "RECUPERACION_ACUMULADA",
+      "COSTE_TOTAL_ACUMULADA",
+      "TASA_DESCUENTO",
+      "ESTADO_CICLO"
+     ]
+    },
+    {
+     "name": "WORK.CONTRATOS_RAW",
+     "role": "seed",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [],
+     "join": "DATALINES",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "ENTIDAD_ORIGEN",
+      "ID_CONTRATO",
+      "ID_FUSION_FINAL",
+      "SW_FUSION"
+     ],
+     "n_datalines": 5,
+     "comment": "",
+     "datalines_fields": [
+      "ID_CONTRATO",
+      "SW_FUSION",
+      "ID_FUSION_FINAL",
+      "ENTIDAD_ORIGEN"
+     ]
+    },
+    {
+     "name": "WORK.BASILEA_MENSUAL_RAW",
+     "role": "seed",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [],
+     "join": "DATALINES",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "ID_CONTRATO",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD"
+     ],
+     "n_datalines": 6,
+     "comment": "",
+     "datalines_fields": [
+      "ID_CONTRATO",
+      "ID_FUSION_FINAL",
+      "ID_FCH_DATOS",
+      "OR_EAD",
+      "OR_DISPTO",
+      "OR_DISBLE"
+     ]
+    },
+    {
+     "name": "WORK.COLATERALES_RAW",
+     "role": "seed",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [],
+     "join": "DATALINES",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [],
+     "fields": [
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 5,
+     "comment": "",
+     "datalines_fields": [
+      "ID_CONTRATO",
+      "VALOR_COLATERAL_INICIAL",
+      "VALOR_COLATERAL",
+      "HAIRCUT"
+     ]
+    },
+    {
+     "name": "WORK.STG_CICLOS",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.CICLOS_RAW"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "ADJUDICACION_FLAG NOT IN ('0','1')"
+     ],
+     "new_fields": [
+      {
+       "var": "PD_ESTIMADA",
+       "expr": "COALESCE(PD_ESTIMADA, .)"
+      },
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "COALESCE(LGD_ESTIMADA, .)"
+      },
+      {
+       "var": "ADJUDICACION_VALOR",
+       "expr": "COALESCE(ADJUDICACION_VALOR, 0)"
+      },
+      {
+       "var": "RECUPERACION_ACUMULADA",
+       "expr": "COALESCE(RECUPERACION_ACUMULADA, 0)"
+      },
+      {
+       "var": "COSTE_TOTAL_ACUMULADA",
+       "expr": "COALESCE(COSTE_TOTAL_ACUMULADA, 0)"
+      },
+      {
+       "var": "ADJUDICACION_FLAG",
+       "expr": "'0'"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ESTADO_CICLO",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MES_CICLO",
+      "PD_ESTIMADA",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.CICLOS_ENR",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.CONTRATOS_RAW",
+      "WORK.STG_CICLOS"
+     ],
+     "join": "MERGE",
+     "by_keys": [
+      "ID_CONTRATO"
+     ],
+     "filters": [
+      {
+       "kind": "WHERE",
+       "condition": "a"
+      }
+     ],
+     "conditions": [],
+     "new_fields": [
+      {
+       "var": "SW_FUSION",
+       "expr": "COALESCE(SW_FUSION, 0)"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MES_CICLO",
+      "PD_ESTIMADA",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.CICLOS_EAD",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.BASILEA_MENSUAL_RAW",
+      "WORK.CICLOS_ENR",
+      "WORK.COLATERALES_RAW"
+     ],
+     "join": "PROC SQL",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [
+      {
+       "var": "OR_EAD",
+       "expr": "b.OR_EAD"
+      },
+      {
+       "var": "OR_DISPTO",
+       "expr": "b.OR_DISPTO"
+      },
+      {
+       "var": "OR_DISBLE",
+       "expr": "b.OR_DISBLE"
+      },
+      {
+       "var": "VALOR_COLATERAL_INICIAL",
+       "expr": "col.VALOR_COLATERAL_INICIAL"
+      },
+      {
+       "var": "VALOR_COLATERAL",
+       "expr": "col.VALOR_COLATERAL"
+      },
+      {
+       "var": "HAIRCUT",
+       "expr": "col.HAIRCUT"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MES_CICLO",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD",
+      "PD_ESTIMADA",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.PD_CAL",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.CICLOS_EAD"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "SEGMENTO = 'RETAIL_HIP'"
+     ],
+     "new_fields": [
+      {
+       "var": "PD_SUELO",
+       "expr": "0.0005"
+      },
+      {
+       "var": "PD_SUELO",
+       "expr": "0.0003"
+      },
+      {
+       "var": "PD_FINAL",
+       "expr": "MAX(PD_ESTIMADA, PD_SUELO)"
+      },
+      {
+       "var": "PD_DOWNTURN",
+       "expr": "MIN(1, PD_ESTIMADA * 1.5)"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "LGD_ESTIMADA",
+      "LGD_REALIZADA",
+      "MES_CICLO",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD",
+      "PD_DOWNTURN",
+      "PD_ESTIMADA",
+      "PD_FINAL",
+      "PD_SUELO",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.LGD_CAL",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.PD_CAL"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "COLATERAL_TIPO = 'HIPOTECA'",
+      "SEGMENTO = 'CORP'",
+      "LGD_ESTIMADA = ."
+     ],
+     "new_fields": [
+      {
+       "var": "LGD_SUELO",
+       "expr": "0.30"
+      },
+      {
+       "var": "LGD_SUELO",
+       "expr": "0.45"
+      },
+      {
+       "var": "LGD_ESTIMADA",
+       "expr": "0.45"
+      },
+      {
+       "var": "MOC",
+       "expr": "0.05 * LGD_ESTIMADA"
+      },
+      {
+       "var": "LGD_CON_MOC",
+       "expr": "LGD_ESTIMADA + MOC"
+      },
+      {
+       "var": "LGD_FINAL",
+       "expr": "MAX(LGD_CON_MOC, LGD_SUELO)"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "LGD_CON_MOC",
+      "LGD_ESTIMADA",
+      "LGD_FINAL",
+      "LGD_REALIZADA",
+      "LGD_SUELO",
+      "MES_CICLO",
+      "MOC",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD",
+      "PD_DOWNTURN",
+      "PD_ESTIMADA",
+      "PD_FINAL",
+      "PD_SUELO",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "WORK.EAD_CAL",
+     "role": "derived",
+     "libref": "WORK",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.LGD_CAL"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [],
+     "new_fields": [
+      {
+       "var": "CCF_ESTIMADO",
+       "expr": "0.75"
+      },
+      {
+       "var": "EAD_BALANCE",
+       "expr": "COALESCE(OR_DISPTO, SALDO_PENDIENTE)"
+      },
+      {
+       "var": "EAD_FUERA_BALANCE",
+       "expr": "CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)"
+      },
+      {
+       "var": "EAD_TOTAL",
+       "expr": "EAD_BALANCE + EAD_FUERA_BALANCE"
+      },
+      {
+       "var": "EAD",
+       "expr": "EAD_TOTAL"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "CCF_ESTIMADO",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "EAD_BALANCE",
+      "EAD_FUERA_BALANCE",
+      "EAD_TOTAL",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "LGD_CON_MOC",
+      "LGD_ESTIMADA",
+      "LGD_FINAL",
+      "LGD_REALIZADA",
+      "LGD_SUELO",
+      "MES_CICLO",
+      "MOC",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD",
+      "PD_DOWNTURN",
+      "PD_ESTIMADA",
+      "PD_FINAL",
+      "PD_SUELO",
+      "PRODUCTO",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    },
+    {
+     "name": "MYLIB.CICLOS_CALIBRADOS",
+     "role": "final",
+     "libref": "MYLIB",
+     "defined_in": "DQC/eval/sas/ciclos_calibrados_pipeline.sas",
+     "inputs": [
+      "WORK.EAD_CAL"
+     ],
+     "join": "SET",
+     "by_keys": [],
+     "filters": [],
+     "conditions": [
+      "SEGMENTO = 'CORP'",
+      "DPDS >= 30 AND STAGE_IFRS9 = 1"
+     ],
+     "new_fields": [
+      {
+       "var": "K_IRB",
+       "expr": "SQRT(PD_FINAL) * 0.06 + PD_FINAL * 0.5"
+      },
+      {
+       "var": "M_VENCIMIENTO",
+       "expr": "2.5"
+      },
+      {
+       "var": "M_VENCIMIENTO",
+       "expr": "MIN(5, MAX(1, 3.0))"
+      },
+      {
+       "var": "RWA",
+       "expr": "EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB"
+      },
+      {
+       "var": "ECL",
+       "expr": "PD_FINAL * LGD_FINAL * EAD_TOTAL"
+      },
+      {
+       "var": "PROVISION",
+       "expr": "ECL"
+      },
+      {
+       "var": "STAGE_IFRS9",
+       "expr": "2"
+      }
+     ],
+     "fields": [
+      "ADJUDICACION_FLAG",
+      "ADJUDICACION_TIPO",
+      "ADJUDICACION_VALOR",
+      "CALIBRATION_SEGMENT",
+      "CAUSA_DEFAULT",
+      "CCF_ESTIMADO",
+      "COLATERAL_TIPO",
+      "COSTE_TOTAL_ACUMULADA",
+      "CURE_FLAG",
+      "DPDS",
+      "EAD",
+      "EAD_BALANCE",
+      "EAD_FUERA_BALANCE",
+      "EAD_TOTAL",
+      "ECL",
+      "ENTIDAD_ORIGEN",
+      "ESTADO_CICLO",
+      "HAIRCUT",
+      "ID_CONTRATO",
+      "ID_CONTR_CICLO_LGD",
+      "ID_FCH_DATOS",
+      "ID_FUSION_FINAL",
+      "INTERESES_ACUMULADOS",
+      "K_IRB",
+      "LGD_CON_MOC",
+      "LGD_ESTIMADA",
+      "LGD_FINAL",
+      "LGD_REALIZADA",
+      "LGD_SUELO",
+      "MES_CICLO",
+      "MOC",
+      "M_VENCIMIENTO",
+      "OR_DISBLE",
+      "OR_DISPTO",
+      "OR_EAD",
+      "PD_DOWNTURN",
+      "PD_ESTIMADA",
+      "PD_FINAL",
+      "PD_SUELO",
+      "PRODUCTO",
+      "PROVISION",
+      "RATING_GRADO",
+      "RECUPERACION_ACUMULADA",
+      "RWA",
+      "SALDO_PENDIENTE",
+      "SEGMENTO",
+      "STAGE_IFRS9",
+      "SW_FUSION",
+      "TASA_DESCUENTO",
+      "TERMINACION",
+      "TIPO_INTERES_ACTUAL",
+      "TIPO_INTERES_ORIGINAL",
+      "VALOR_COLATERAL",
+      "VALOR_COLATERAL_INICIAL"
+     ],
+     "n_datalines": 0,
+     "comment": ""
+    }
+   ],
+   "table_edges": [
+    {
+     "source": "WORK.CICLOS_RAW",
+     "target": "WORK.STG_CICLOS",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.CONTRATOS_RAW",
+     "target": "WORK.CICLOS_ENR",
+     "kind": "MERGE"
+    },
+    {
+     "source": "WORK.STG_CICLOS",
+     "target": "WORK.CICLOS_ENR",
+     "kind": "MERGE"
+    },
+    {
+     "source": "WORK.BASILEA_MENSUAL_RAW",
+     "target": "WORK.CICLOS_EAD",
+     "kind": "PROC SQL"
+    },
+    {
+     "source": "WORK.CICLOS_ENR",
+     "target": "WORK.CICLOS_EAD",
+     "kind": "PROC SQL"
+    },
+    {
+     "source": "WORK.COLATERALES_RAW",
+     "target": "WORK.CICLOS_EAD",
+     "kind": "PROC SQL"
+    },
+    {
+     "source": "WORK.CICLOS_EAD",
+     "target": "WORK.PD_CAL",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.PD_CAL",
+     "target": "WORK.LGD_CAL",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.LGD_CAL",
+     "target": "WORK.EAD_CAL",
+     "kind": "SET"
+    },
+    {
+     "source": "WORK.EAD_CAL",
+     "target": "MYLIB.CICLOS_CALIBRADOS",
+     "kind": "SET"
+    }
+   ],
+   "field_nodes": [
+    {
+     "id": "A",
+     "label": "A",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "ADJUDICACION_FLAG",
+     "label": "ADJUDICACION_FLAG",
+     "kind": "input",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "ADJUDICACION_VALOR",
+     "label": "ADJUDICACION_VALOR",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "CCF_ESTIMADO",
+     "label": "CCF_ESTIMADO",
+     "kind": "input",
+     "layer": 6,
+     "data_steps": [
+      "work.ead_cal"
+     ]
+    },
+    {
+     "id": "COLATERAL_TIPO",
+     "label": "COLATERAL_TIPO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "COSTE_TOTAL_ACUMULADA",
+     "label": "COSTE_TOTAL_ACUMULADA",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "DPDS",
+     "label": "DPDS",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "EAD",
+     "label": "EAD",
+     "kind": "computed",
+     "layer": 6,
+     "data_steps": [
+      "work.ead_cal"
+     ]
+    },
+    {
+     "id": "EAD_BALANCE",
+     "label": "EAD_BALANCE",
+     "kind": "modified",
+     "layer": 6,
+     "data_steps": [
+      "work.ead_cal"
+     ]
+    },
+    {
+     "id": "EAD_FUERA_BALANCE",
+     "label": "EAD_FUERA_BALANCE",
+     "kind": "modified",
+     "layer": 6,
+     "data_steps": [
+      "work.ead_cal"
+     ]
+    },
+    {
+     "id": "EAD_TOTAL",
+     "label": "EAD_TOTAL",
+     "kind": "modified",
+     "layer": 6,
+     "data_steps": [
+      "work.ead_cal"
+     ]
+    },
+    {
+     "id": "ECL",
+     "label": "ECL",
+     "kind": "modified",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "HAIRCUT",
+     "label": "HAIRCUT",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "K_IRB",
+     "label": "K_IRB",
+     "kind": "modified",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "LGD_CON_MOC",
+     "label": "LGD_CON_MOC",
+     "kind": "modified",
+     "layer": 5,
+     "data_steps": [
+      "work.lgd_cal"
+     ]
+    },
+    {
+     "id": "LGD_ESTIMADA",
+     "label": "LGD_ESTIMADA",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead",
+      "work.lgd_cal"
+     ]
+    },
+    {
+     "id": "LGD_FINAL",
+     "label": "LGD_FINAL",
+     "kind": "modified",
+     "layer": 5,
+     "data_steps": [
+      "work.lgd_cal"
+     ]
+    },
+    {
+     "id": "LGD_SUELO",
+     "label": "LGD_SUELO",
+     "kind": "modified",
+     "layer": 5,
+     "data_steps": [
+      "work.lgd_cal"
+     ]
+    },
+    {
+     "id": "MOC",
+     "label": "MOC",
+     "kind": "modified",
+     "layer": 5,
+     "data_steps": [
+      "work.lgd_cal"
+     ]
+    },
+    {
+     "id": "M_VENCIMIENTO",
+     "label": "M_VENCIMIENTO",
+     "kind": "computed",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "OR_DISBLE",
+     "label": "OR_DISBLE",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "OR_DISPTO",
+     "label": "OR_DISPTO",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "OR_EAD",
+     "label": "OR_EAD",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "PD_DOWNTURN",
+     "label": "PD_DOWNTURN",
+     "kind": "computed",
+     "layer": 4,
+     "data_steps": [
+      "work.pd_cal"
+     ]
+    },
+    {
+     "id": "PD_ESTIMADA",
+     "label": "PD_ESTIMADA",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "PD_FINAL",
+     "label": "PD_FINAL",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.pd_cal"
+     ]
+    },
+    {
+     "id": "PD_SUELO",
+     "label": "PD_SUELO",
+     "kind": "modified",
+     "layer": 4,
+     "data_steps": [
+      "work.pd_cal"
+     ]
+    },
+    {
+     "id": "PROVISION",
+     "label": "PROVISION",
+     "kind": "computed",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "RECUPERACION_ACUMULADA",
+     "label": "RECUPERACION_ACUMULADA",
+     "kind": "modified",
+     "layer": 1,
+     "data_steps": [
+      "work.stg_ciclos",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "RWA",
+     "label": "RWA",
+     "kind": "computed",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "SALDO_PENDIENTE",
+     "label": "SALDO_PENDIENTE",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "SEGMENTO",
+     "label": "SEGMENTO",
+     "kind": "input",
+     "layer": 0,
+     "data_steps": []
+    },
+    {
+     "id": "STAGE_IFRS9",
+     "label": "STAGE_IFRS9",
+     "kind": "modified",
+     "layer": 7,
+     "data_steps": [
+      "mylib.ciclos_calibrados"
+     ]
+    },
+    {
+     "id": "SW_FUSION",
+     "label": "SW_FUSION",
+     "kind": "modified",
+     "layer": 2,
+     "data_steps": [
+      "work.ciclos_enr",
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "VALOR_COLATERAL",
+     "label": "VALOR_COLATERAL",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    },
+    {
+     "id": "VALOR_COLATERAL_INICIAL",
+     "label": "VALOR_COLATERAL_INICIAL",
+     "kind": "input",
+     "layer": 3,
+     "data_steps": [
+      "work.ciclos_ead"
+     ]
+    }
+   ],
+   "field_edges": [
+    {
+     "source": "PD_ESTIMADA",
+     "target": "PD_ESTIMADA",
+     "kind": "assigns",
+     "data_step": "work.stg_ciclos",
+     "expr": "COALESCE(PD_ESTIMADA, .)"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_ESTIMADA",
+     "kind": "assigns",
+     "data_step": "work.stg_ciclos",
+     "expr": "COALESCE(LGD_ESTIMADA, .)"
+    },
+    {
+     "source": "ADJUDICACION_VALOR",
+     "target": "ADJUDICACION_VALOR",
+     "kind": "assigns",
+     "data_step": "work.stg_ciclos",
+     "expr": "COALESCE(ADJUDICACION_VALOR, 0)"
+    },
+    {
+     "source": "RECUPERACION_ACUMULADA",
+     "target": "RECUPERACION_ACUMULADA",
+     "kind": "assigns",
+     "data_step": "work.stg_ciclos",
+     "expr": "COALESCE(RECUPERACION_ACUMULADA, 0)"
+    },
+    {
+     "source": "COSTE_TOTAL_ACUMULADA",
+     "target": "COSTE_TOTAL_ACUMULADA",
+     "kind": "assigns",
+     "data_step": "work.stg_ciclos",
+     "expr": "COALESCE(COSTE_TOTAL_ACUMULADA, 0)"
+    },
+    {
+     "source": "SW_FUSION",
+     "target": "SW_FUSION",
+     "kind": "assigns",
+     "data_step": "work.ciclos_enr",
+     "expr": "COALESCE(SW_FUSION, 0)"
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "PD_SUELO",
+     "kind": "conditions",
+     "data_step": "work.pd_cal",
+     "expr": ""
+    },
+    {
+     "source": "PD_SUELO",
+     "target": "PD_FINAL",
+     "kind": "assigns",
+     "data_step": "work.pd_cal",
+     "expr": "MAX(PD_ESTIMADA, PD_SUELO)"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "PD_FINAL",
+     "kind": "assigns",
+     "data_step": "work.pd_cal",
+     "expr": "MAX(PD_ESTIMADA, PD_SUELO)"
+    },
+    {
+     "source": "PD_ESTIMADA",
+     "target": "PD_DOWNTURN",
+     "kind": "assigns",
+     "data_step": "work.pd_cal",
+     "expr": "MIN(1, PD_ESTIMADA * 1.5)"
+    },
+    {
+     "source": "COLATERAL_TIPO",
+     "target": "LGD_SUELO",
+     "kind": "conditions",
+     "data_step": "work.lgd_cal",
+     "expr": ""
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "LGD_SUELO",
+     "kind": "conditions",
+     "data_step": "work.lgd_cal",
+     "expr": ""
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_cal",
+     "expr": "0.05 * LGD_ESTIMADA"
+    },
+    {
+     "source": "MOC",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_cal",
+     "expr": "LGD_ESTIMADA + MOC"
+    },
+    {
+     "source": "LGD_ESTIMADA",
+     "target": "LGD_CON_MOC",
+     "kind": "assigns",
+     "data_step": "work.lgd_cal",
+     "expr": "LGD_ESTIMADA + MOC"
+    },
+    {
+     "source": "LGD_CON_MOC",
+     "target": "LGD_FINAL",
+     "kind": "assigns",
+     "data_step": "work.lgd_cal",
+     "expr": "MAX(LGD_CON_MOC, LGD_SUELO)"
+    },
+    {
+     "source": "LGD_SUELO",
+     "target": "LGD_FINAL",
+     "kind": "assigns",
+     "data_step": "work.lgd_cal",
+     "expr": "MAX(LGD_CON_MOC, LGD_SUELO)"
+    },
+    {
+     "source": "SALDO_PENDIENTE",
+     "target": "EAD_BALANCE",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "COALESCE(OR_DISPTO, SALDO_PENDIENTE)"
+    },
+    {
+     "source": "OR_DISPTO",
+     "target": "EAD_BALANCE",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "COALESCE(OR_DISPTO, SALDO_PENDIENTE)"
+    },
+    {
+     "source": "CCF_ESTIMADO",
+     "target": "EAD_FUERA_BALANCE",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)"
+    },
+    {
+     "source": "OR_DISBLE",
+     "target": "EAD_FUERA_BALANCE",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "CCF_ESTIMADO * COALESCE(OR_DISBLE, 0)"
+    },
+    {
+     "source": "EAD_BALANCE",
+     "target": "EAD_TOTAL",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "EAD_BALANCE + EAD_FUERA_BALANCE"
+    },
+    {
+     "source": "EAD_FUERA_BALANCE",
+     "target": "EAD_TOTAL",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "EAD_BALANCE + EAD_FUERA_BALANCE"
+    },
+    {
+     "source": "EAD_TOTAL",
+     "target": "EAD",
+     "kind": "assigns",
+     "data_step": "work.ead_cal",
+     "expr": "EAD_TOTAL"
+    },
+    {
+     "source": "PD_FINAL",
+     "target": "K_IRB",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "SQRT(PD_FINAL) * 0.06 + PD_FINAL * 0.5"
+    },
+    {
+     "source": "SEGMENTO",
+     "target": "M_VENCIMIENTO",
+     "kind": "conditions",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": ""
+    },
+    {
+     "source": "K_IRB",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB"
+    },
+    {
+     "source": "EAD_TOTAL",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB"
+    },
+    {
+     "source": "LGD_FINAL",
+     "target": "RWA",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "EAD_TOTAL * LGD_FINAL * 12.5 * K_IRB"
+    },
+    {
+     "source": "PD_FINAL",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "PD_FINAL * LGD_FINAL * EAD_TOTAL"
+    },
+    {
+     "source": "EAD_TOTAL",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "PD_FINAL * LGD_FINAL * EAD_TOTAL"
+    },
+    {
+     "source": "LGD_FINAL",
+     "target": "ECL",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "PD_FINAL * LGD_FINAL * EAD_TOTAL"
+    },
+    {
+     "source": "ECL",
+     "target": "PROVISION",
+     "kind": "assigns",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": "ECL"
+    },
+    {
+     "source": "DPDS",
+     "target": "STAGE_IFRS9",
+     "kind": "conditions",
+     "data_step": "mylib.ciclos_calibrados",
+     "expr": ""
+    }
+   ],
+   "data_steps": [
+    "work.ciclos_raw",
+    "work.contratos_raw",
+    "work.basilea_mensual_raw",
+    "work.colaterales_raw",
+    "work.stg_ciclos",
+    "work.ciclos_enr",
+    "work.ciclos_ead",
+    "work.pd_cal",
+    "work.lgd_cal",
+    "work.ead_cal",
+    "mylib.ciclos_calibrados"
+   ]
+  }
+ ]
+}
