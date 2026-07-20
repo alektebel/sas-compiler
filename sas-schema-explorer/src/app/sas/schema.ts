@@ -59,6 +59,8 @@ export interface Schema {
   warnings: string[];
   /** which analyzer produced this: 'regllm' (backend) or 'local' (TS port) */
   engine?: string;
+  /** True only when the backend completed without compiler warnings. */
+  compiled?: boolean;
 }
 
 export function buildSchema(files: SourceFile[]): Schema {

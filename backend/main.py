@@ -73,6 +73,7 @@ async def analyze_endpoint(
 
     result = analyze(programs)
     result["warnings"] = warnings + result.get("warnings", [])
+    result["compiled"] = not result["warnings"]
     return JSONResponse(result)
 
 

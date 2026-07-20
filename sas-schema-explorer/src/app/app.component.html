@@ -50,6 +50,35 @@
   }
 </div>
 
+@if (state.analyzing()) {
+  <div class="compile-progress" role="status" aria-live="polite">
+    <div class="compile-progress-head">
+      <span>
+        {{ state.analysisPhase() === 'compiling' ? 'Compilando con regllm…' :
+           state.analysisPhase() === 'local' ? 'Analizando localmente…' : 'Preparando ficheros…' }}
+      </span>
+      <span>{{ state.analysisProgress() }}%</span>
+    </div>
+    <div class="compile-track" role="progressbar" [attr.aria-valuenow]="state.analysisProgress()"
+         aria-valuemin="0" aria-valuemax="100"
+         [class.indeterminate]="state.analysisPhase() === 'compiling'">
+      <div class="compile-fill" [style.width.%]="state.analysisProgress()"></div>
+    </div>
+  </div>
+}
+
+@if (!state.analyzing() && state.analysisResult() !== 'idle') {
+  <div class="compile-result" [class.confirmed]="state.analysisResult() === 'compiled'"
+       [class.fallback]="state.analysisResult() === 'local'"
+       [class.failed]="state.analysisResult() === 'failed'" role="status">
+    @switch (state.analysisResult()) {
+      @case ('compiled') { <span><b>✓ Compilación confirmada.</b> El programa fue procesado correctamente por regllm.</span> }
+      @case ('local') { <span><b>⚠ Compilación no confirmada.</b> Se muestran resultados del análisis local porque el backend no estaba disponible.</span> }
+      @case ('failed') { <span><b>✕ Compilación no confirmada.</b> El compilador devolvió advertencias o no pudo procesar el programa por completo.</span> }
+    }
+  </div>
+}
+
 @if (pasteOpen()) {
   <div class="pastebox">
     <textarea rows="10" spellcheck="false"

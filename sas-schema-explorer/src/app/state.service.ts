@@ -4,6 +4,8 @@ import { readEgp } from './sas/egp';
 
 export type View = 'tabla' | 'flujo' | 'campos';
 export type Engine = 'regllm' | 'local';
+export type AnalysisPhase = 'idle' | 'preparing' | 'compiling' | 'local' | 'complete';
+export type AnalysisResult = 'idle' | 'running' | 'compiled' | 'local' | 'failed';
 
 export interface LoadedFile {
   name: string;
@@ -20,6 +22,9 @@ export class StateService {
   readonly schema = signal<Schema | null>(null);
   readonly engine = signal<Engine | null>(null);
   readonly analyzing = signal(false);
+  readonly analysisPhase = signal<AnalysisPhase>('idle');
+  readonly analysisProgress = signal(0);
+  readonly analysisResult = signal<AnalysisResult>('idle');
   readonly view = signal<View>('tabla');
   readonly selectedTable = signal<string | null>(null);
   readonly selectedField = signal<string | null>(null);
@@ -84,6 +89,9 @@ export class StateService {
     this.selectedTable.set(null);
     this.selectedField.set(null);
     this.loadError.set(null);
+    this.analysisPhase.set('idle');
+    this.analysisProgress.set(0);
+    this.analysisResult.set('idle');
   }
 
   /** Backend first (real regllm compiler); local TS parser as fallback. */
@@ -95,15 +103,24 @@ export class StateService {
     if (!files.length) {
       this.schema.set(null);
       this.engine.set(null);
+      this.analysisResult.set('idle');
       return;
     }
     this.analyzing.set(true);
+    this.analysisResult.set('running');
+    this.analysisPhase.set('preparing');
+    this.analysisProgress.set(12);
     try {
+      this.analysisPhase.set('compiling');
+      this.analysisProgress.set(25);
       const schema = await this.analyzeRemote(files);
       this.schema.set(schema);
       this.engine.set('regllm');
+      this.analysisResult.set(schema.compiled === false ? 'failed' : 'compiled');
     } catch {
       try {
+        this.analysisPhase.set('local');
+        this.analysisProgress.set(55);
         const schema = await this.analyzeLocal(files);
         schema.warnings = [
           'Backend no disponible — análisis local aproximado (sin expansión de macros). ' +
@@ -112,12 +129,16 @@ export class StateService {
         ];
         this.schema.set(schema);
         this.engine.set('local');
+        this.analysisResult.set('local');
       } catch (e) {
         this.loadError.set(`No se pudo analizar: ${String(e)}`);
         this.schema.set(null);
         this.engine.set(null);
+        this.analysisResult.set('failed');
       }
     } finally {
+      this.analysisProgress.set(100);
+      this.analysisPhase.set('complete');
       this.analyzing.set(false);
     }
   }
