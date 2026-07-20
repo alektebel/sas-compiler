@@ -118,7 +118,7 @@ export class StateService {
     this.analysisProgress.set(0);
     this.analysisProcessed.set(0);
     this.analysisTotal.set(0);
-    this.analysisStage.set('Preparando programas');
+    this.analysisStage.set('Extrayendo y preparando programas');
     try {
       this.analysisPhase.set('compiling');
       const schema = await this.analyzeRemote(files);
