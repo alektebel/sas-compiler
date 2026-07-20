@@ -63,6 +63,12 @@ export interface Schema {
   compiled?: boolean;
   finalTables?: string[];
   relevantTables?: string[];
+  flowSummaries?: Array<{
+    final: string | null;
+    tables: string[];
+    edges: TableEdge[];
+    explanation?: string;
+  }>;
   summaryText?: string;
 }
 

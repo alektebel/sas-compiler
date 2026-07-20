@@ -189,7 +189,7 @@ def _resolve_project_macros(programs: list[tuple[str, str]]) -> list[tuple[str, 
 
 def _build_summary(
     tables: dict[str, dict], order: list[str], edges: list[dict], final_tables: list[str],
-) -> tuple[list[str], list[str], str]:
+) -> tuple[list[str], list[str], list[dict], str]:
     relevant = set(final_tables)
     inputs_by_target: dict[str, set[str]] = {}
     for edge in edges:
@@ -206,17 +206,27 @@ def _build_summary(
         edge for edge in edges
         if edge["source"] in relevant and edge["target"] in relevant
     ]
+    flow_summaries: list[dict] = []
     lines = [
         "RESUMEN DEL FLUJO FINAL",
         f"Tablas finales inferidas: {', '.join(final_tables) if final_tables else '(ninguna)'}",
         f"Tablas relevantes: {len(relevant)} de {len(tables)}",
-        "\nFLUJO DE TABLAS (orden de referencia):",
+        "\nGRAFO MINIMO DE DEPENDENCIAS:",
     ]
     if flow_edges:
         for edge in flow_edges:
             lines.append(f"  {edge['source']} -> {edge['target']} [{edge['kind']}]")
     else:
         lines.append("  (sin relaciones entre tablas)")
+
+    lines.append("\nTABLAS UTILIZADAS:")
+    for name in order:
+        if name in relevant:
+            table = tables[name]
+            lines.append(
+                f"  {name} [{table['role']}]"
+                f" ({table['join'] or 'fuente externa'})"
+            )
 
     lines.append("\nCAMINOS HACIA LAS TABLAS FINALES:")
     for final in final_tables:
@@ -233,22 +243,83 @@ def _build_summary(
                 lines.append(f"    {', '.join(sources)} -> {target}")
                 path_pending.extend(sources)
 
-    for name in order:
-        if name not in relevant:
-            continue
-        table = tables[name]
-        inputs = ", ".join(table["inputs"]) or "fuente externa/semilla"
-        lines.append(f"\n{name} [{table['role']}] <- {inputs}")
-        if table["definedIn"]:
-            lines.append(f"  definido en: {table['definedIn']} ({table['join'] or 'SET'})")
-        if table["byKeys"]:
-            lines.append(f"  BY: {', '.join(table['byKeys'])}")
-        for condition in table["filters"]:
-            lines.append(f"  filtro: {condition}")
-        lines.append(f"  campos: {', '.join(table['fields']) if table['fields'] else '(no inferidos)'}")
-        for field in table["newFields"]:
-            lines.append(f"  campo nuevo: {field['var']} = {field['expr']}")
-    return final_tables, [name for name in order if name in relevant], "\n".join(lines) + "\n"
+    final_name = final_tables[0] if len(final_tables) == 1 else None
+    final_table = tables.get(final_name) if final_name else None
+    fallback_explanation = (
+        f"{final_name} se crea a partir de "
+        f"{', '.join(final_table['inputs']) if final_table and final_table['inputs'] else 'fuentes externas'} "
+        f"mediante {final_table['join'] if final_table else 'el flujo analizado'}; "
+        f"incluye {len(final_table['newFields']) if final_table else 0} campos nuevos."
+    )
+    flow_summaries.append({
+        "final": final_name,
+        "tables": [name for name in order if name in relevant],
+        "edges": flow_edges,
+        "explanation": fallback_explanation,
+    })
+    return (
+        final_tables,
+        [name for name in order if name in relevant],
+        flow_summaries,
+        "\n".join(lines) + "\n",
+    )
+
+
+def _clean_flow_with_gguf(
+    flow: dict, tables: dict[str, dict], warnings: list[str],
+) -> dict:
+    """Use GGUF only to order the deterministic table set and explain it."""
+    model = _load_gguf_model(os.environ.get("GGUF_MODEL_PATH", "").strip())
+    if model is None:
+        return flow
+    context = {
+        "final_table": flow["final"],
+        "tables": [
+            {
+                "name": name,
+                "role": tables[name]["role"],
+                "join": tables[name]["join"],
+                "inputs": tables[name]["inputs"],
+            }
+            for name in flow["tables"]
+        ],
+        "edges": flow["edges"],
+    }
+    prompt = (
+        "Summarize this one data flow. Return JSON exactly with an ordered "
+        "tables array containing every supplied table exactly once, and one "
+        "short Spanish sentence explaining why the final table is created and "
+        "what it includes differently. Do not invent tables.\n\n"
+        + json.dumps(context, ensure_ascii=True)
+    )
+    try:
+        response = model.create_chat_completion(
+            messages=[
+                {"role": "system", "content": "You compress one deterministic table flow."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            top_p=1,
+            seed=42,
+            max_tokens=180,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(response["choices"][0]["message"]["content"])
+        ordered = data.get("tables")
+        explanation = data.get("explanation")
+        expected = set(flow["tables"])
+        if (
+            isinstance(ordered, list)
+            and set(ordered) == expected
+            and len(ordered) == len(expected)
+            and isinstance(explanation, str)
+            and explanation.strip()
+        ):
+            return {**flow, "tables": ordered, "explanation": explanation.strip()}
+        warnings.append("El resumen GGUF no conservó el grafo mínimo; se usa el resumen determinista.")
+    except Exception as exc:  # noqa: BLE001 — optional summarization must not block analysis
+        warnings.append(f"Falló el resumen GGUF ({exc}); se usa el resumen determinista.")
+    return flow
 
 
 @lru_cache(maxsize=4)
@@ -574,9 +645,14 @@ def analyze(
         for src in t["inputs"]
     ]
     final_tables = _resolve_final_tables(tables, order, table_edges, warnings)
-    final_tables, relevant_tables, summary_text = _build_summary(
+    final_tables, relevant_tables, flow_summaries, summary_text = _build_summary(
         tables, order, table_edges, final_tables,
     )
+    flow_summaries = [
+        _clean_flow_with_gguf(flow, tables, warnings) for flow in flow_summaries
+    ]
+    if flow_summaries and flow_summaries[0].get("explanation"):
+        summary_text += "\nEXPLICACION DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
 
     if on_progress:
         on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)
@@ -636,5 +712,6 @@ def analyze(
         "engine": "regllm",
         "finalTables": final_tables,
         "relevantTables": relevant_tables,
+        "flowSummaries": flow_summaries,
         "summaryText": summary_text,
     }
