@@ -1,8 +1,38 @@
 # Explorador de esquemas SAS
 
-UI para inspeccionar las tablas SAS y las interrelaciones entre campos de los
-pipelines del repositorio [`alektebel/regllm`](https://github.com/alektebel/regllm),
-extraídas con el propio compilador SAS del proyecto (`src/sas_logic_tree.py`).
+## La aplicación: `sas-schema-explorer/` (Angular)
+
+Aplicación Angular donde cargas **tus propios** programas `.sas` o proyectos de
+Enterprise Guide `.egp` (también puedes pegar código) y explora:
+
+- todas las tablas (pasos DATA, MERGE, PROC SQL, DATALINES) con su rol,
+  filtros, claves BY y campos — marcando cuáles se crean en cada paso y con
+  qué fórmula;
+- el grafo de flujo entre tablas;
+- el linaje campo a campo (ancestros y descendientes, con las expresiones de
+  cada relación);
+- descarga del inventario completo en texto plano.
+
+Todo el análisis (incluida la descompresión de los `.egp`, que son archivos
+ZIP con los programas embebidos) se ejecuta **en el navegador**: el código SAS
+no se sube a ningún servidor.
+
+```bash
+cd sas-schema-explorer
+npm install
+npx ng serve            # desarrollo en http://localhost:4200
+npm run build:single    # produce dist/sas-schema-explorer/single/index.html,
+                        # un único HTML autocontenido que se abre con doble clic
+```
+
+El parser TypeScript (`src/app/sas/`) es un port del subconjunto de extracción
+del compilador SAS de [`alektebel/regllm`](https://github.com/alektebel/regllm)
+(`src/sas_logic_tree.py`).
+
+## Versión estática original (raíz del repo)
+
+La primera versión inspeccionaba los pipelines de regllm con datos
+pre-extraídos usando directamente el compilador Python.
 
 ## Qué hace
 

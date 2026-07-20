@@ -1,0 +1,122 @@
+<header>
+  <div class="brand">
+    <h1>Explorador de esquemas SAS</h1>
+    <p>carga tus programas <code>.sas</code> o proyectos <code>.egp</code> — el análisis es 100% local, tu código no sale del navegador</p>
+  </div>
+  <div class="stats">
+    @for (st of stats(); track st.l) {
+      <div class="stat"><b>{{ st.v }}</b><span>{{ st.l }}</span></div>
+    }
+  </div>
+  <button id="btn-download" type="button" [disabled]="!state.schema()"
+          title="Descargar inventario de tablas y campos en texto plano" (click)="download()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M7 1.5v7.5M4 6.5 7 9.5l3-3M2 12.5h10"/>
+    </svg>
+    Descargar .txt
+  </button>
+</header>
+
+<div class="loaderbar" [class.dragging]="dragOver()"
+     (dragover)="onDragOver($event)" (dragleave)="dragOver.set(false)" (drop)="onDrop($event)">
+  <label class="filebtn">
+    <input type="file" multiple accept=".sas,.egp,.txt" (change)="onFileInput($event)">
+    Cargar ficheros…
+  </label>
+  <button type="button" class="ghostbtn" (click)="pasteOpen.set(!pasteOpen())">Pegar código</button>
+  <span class="drophint">o arrastra aquí tus .sas / .egp</span>
+  <span class="filechips">
+    @for (f of state.files(); track f.name) {
+      <span class="fchip" [attr.title]="f.name">
+        {{ f.name }}
+        <button type="button" class="fchip-x" [attr.aria-label]="'Quitar ' + f.name"
+                (click)="state.removeFile(f.name)">×</button>
+      </span>
+    }
+  </span>
+  @if (state.files().length) {
+    <button type="button" class="ghostbtn danger" (click)="state.clear()">Limpiar todo</button>
+  }
+</div>
+
+@if (pasteOpen()) {
+  <div class="pastebox">
+    <textarea rows="10" spellcheck="false"
+              placeholder="Pega aquí código SAS (pasos DATA, PROC SQL…)"
+              [value]="pasteText()" (input)="onPasteInput($event)"></textarea>
+    <div class="pastebox-actions">
+      <button type="button" class="primary" [disabled]="!pasteText().trim()" (click)="submitPaste()">Analizar</button>
+      <button type="button" class="ghostbtn" (click)="pasteOpen.set(false)">Cancelar</button>
+    </div>
+  </div>
+}
+
+@if (state.loadError(); as err) {
+  <p class="loaderr" role="alert">{{ err }}</p>
+}
+@if (state.schema(); as s) {
+  @for (w of s.warnings; track w) {
+    <p class="loaderr" role="alert">{{ w }}</p>
+  }
+}
+
+@if (state.schema(); as s) {
+  <div class="shell">
+    <aside>
+      <input id="search" type="search" placeholder="Filtrar tablas o campos…" autocomplete="off"
+             [value]="state.search()" (input)="onSearch($event)">
+      <div class="tlist">
+        @for (t of state.filteredTables(); track t.name) {
+          <button type="button" class="trow" [class.on]="t.name === state.currentTable()?.name"
+                  (click)="state.selectTable(t.name)">
+            <span class="dot" [style.background]="rolesMap[t.role].css"></span>
+            <span class="nm">{{ splitName(t.name).base }}<br>
+              <span class="lib">{{ splitName(t.name).lib || '—' }}</span></span>
+            <span class="cnt">{{ t.fields.length }}</span>
+          </button>
+        } @empty {
+          <div class="empty">Sin resultados</div>
+        }
+      </div>
+      <div class="legend">
+        @for (r of roles; track r.label) {
+          <span><span class="dot" [style.background]="r.css"></span>{{ r.label }}</span>
+        }
+      </div>
+    </aside>
+
+    <main>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" [class.on]="state.view() === 'tabla'" (click)="setView('tabla')">Tabla</button>
+        <button class="tab" role="tab" [class.on]="state.view() === 'flujo'" (click)="setView('flujo')">Flujo de tablas</button>
+        <button class="tab" role="tab" [class.on]="state.view() === 'campos'" (click)="setView('campos')">Linaje de campos</button>
+      </div>
+      @switch (state.view()) {
+        @case ('tabla') { <app-table-view/> }
+        @case ('flujo') { <app-flow-view/> }
+        @case ('campos') { <app-lineage-view/> }
+      }
+    </main>
+  </div>
+} @else {
+  <div class="hero" [class.dragging]="dragOver()"
+       (dragover)="onDragOver($event)" (dragleave)="dragOver.set(false)" (drop)="onDrop($event)">
+    <svg width="46" height="46" viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M23 6v22M14 19l9 9 9-9M8 38h30"/>
+    </svg>
+    <h2>Arrastra tus ficheros SAS aquí</h2>
+    <p>Acepta programas <code>.sas</code> y proyectos de Enterprise Guide <code>.egp</code>.
+      Se extraen todas las tablas (DATA, MERGE, PROC SQL), sus campos con fórmulas
+      y el grafo de interrelaciones entre campos.</p>
+    <div class="hero-actions">
+      <label class="filebtn big">
+        <input type="file" multiple accept=".sas,.egp,.txt" (change)="onFileInput($event)">
+        Elegir ficheros…
+      </label>
+      <button type="button" class="ghostbtn" (click)="pasteOpen.set(true)">o pegar código</button>
+    </div>
+    <p class="privacy">El análisis se ejecuta íntegramente en tu navegador: ningún fichero se sube a ningún servidor.</p>
+  </div>
+}
