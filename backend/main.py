@@ -77,12 +77,13 @@ async def analyze_endpoint(
     def events():
         queue: Queue[dict | None] = Queue()
 
-        def progress(processed: int, total: int, stage: str) -> None:
+        def progress(processed: int, total: int, stage: str, overall: int) -> None:
             queue.put({
                 "type": "progress",
                 "processed": processed,
                 "total": total,
                 "stage": stage,
+                "overall": overall,
             })
 
         def compile_programs() -> None:

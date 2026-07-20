@@ -56,11 +56,14 @@
       <span>
         {{ state.analysisStage() }}
       </span>
-      <span>{{ state.analysisProcessed() | number }} / {{ state.analysisTotal() | number }} caracteres</span>
+      <span>
+        {{ state.analysisProcessed() | number }} / {{ state.analysisTotal() | number }} caracteres
+        · {{ state.analysisProgress() }}% total
+      </span>
     </div>
     <div class="compile-track" role="progressbar" [attr.aria-valuenow]="state.analysisProgress()"
          aria-valuemin="0" aria-valuemax="100"
-         [attr.aria-valuetext]="state.analysisProcessed() + ' caracteres procesados de ' + state.analysisTotal()">
+         [attr.aria-valuetext]="state.analysisStage() + ': ' + state.analysisProgress() + '% del proceso total'">
       <div class="compile-fill" [style.width.%]="state.analysisProgress()"></div>
     </div>
   </div>

@@ -113,7 +113,7 @@ def _collect_filters(body, out):
 
 def analyze(
     programs: list[tuple[str, str]],
-    on_progress: Callable[[int, int, str], None] | None = None,
+    on_progress: Callable[[int, int, str, int], None] | None = None,
 ) -> dict:
     """programs: list of (name, sas_code). Returns the frontend Schema dict."""
     tree = SASLogicTree()
@@ -126,10 +126,11 @@ def analyze(
 
     def report(filename: str) -> None:
         if on_progress:
-            on_progress(processed_chars, total_chars, f"Analizando {filename}")
+            overall = round((processed_chars / total_chars) * 60) if total_chars else 0
+            on_progress(processed_chars, total_chars, f"Analizando {filename}", overall)
 
     if on_progress:
-        on_progress(0, total_chars, "Preparando programas")
+        on_progress(0, total_chars, "Preparando programas", 0)
 
     def get_table(name: str) -> dict:
         key = _norm(name)
@@ -229,6 +230,9 @@ def analyze(
             "No se encontró ningún paso DATA ni PROC SQL CREATE TABLE en los ficheros cargados."
         )
 
+    if on_progress:
+        on_progress(processed_chars, total_chars, "Construyendo tablas y esquema", 60)
+
     # ── Read-before-write source attribution ─────────────────────────
     produced: set[str] = set()
     external: set[str] = set()
@@ -270,6 +274,9 @@ def analyze(
     for n in source_names:
         tables[n]["fields"] = sorted(consumed[n])
 
+    if on_progress:
+        on_progress(processed_chars, total_chars, "Resolviendo dependencias y campos", 80)
+
     # ── Downstream propagation ───────────────────────────────────────
     resolved: dict[str, set[str]] = {}
 
@@ -306,11 +313,14 @@ def analyze(
         for src in t["inputs"]
     ]
 
+    if on_progress:
+        on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)
+
     # ── Field lineage straight from the compiler ─────────────────────
     full = tree.parse("\n".join(code for _, code in programs))
     lineage = tree.lineage(full)
     if on_progress:
-        on_progress(total_chars, total_chars, "Linaje y resultado final")
+        on_progress(total_chars, total_chars, "Finalizando resultado", 98)
     field_nodes = [
         {"id": n["id"], "kind": n.get("kind", "computed")}
         for n in lineage.nodes

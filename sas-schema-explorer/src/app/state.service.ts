@@ -175,6 +175,7 @@ export class StateService {
           processed?: number;
           total?: number;
           stage?: string;
+          overall?: number;
           result?: Schema;
           message?: string;
         };
@@ -183,7 +184,7 @@ export class StateService {
           const total = event.total ?? 0;
           this.analysisProcessed.set(processed);
           this.analysisTotal.set(total);
-          this.analysisProgress.set(total ? Math.round((processed / total) * 100) : 100);
+          this.analysisProgress.set(event.overall ?? (total ? Math.round((processed / total) * 100) : 100));
           this.analysisStage.set(event.stage ?? 'Compilando programa');
         } else if (event.type === 'result' && event.result) {
           return event.result;
@@ -216,7 +217,11 @@ export class StateService {
       this.analysisStage.set(`Preparando ${f.name}`);
     }
     this.analysisStage.set('Generando tablas y linaje');
-    return buildSchema(sources);
+    this.analysisProgress.set(60);
+    const schema = buildSchema(sources);
+    this.analysisStage.set('Análisis local completado');
+    this.analysisProgress.set(100);
+    return schema;
   }
 
   selectTable(name: string): void {
