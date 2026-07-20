@@ -10,8 +10,11 @@ lineage. The JSON shape mirrors the TypeScript interfaces in
 from __future__ import annotations
 
 import os
+import json
+import re
 import sys
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -125,6 +128,209 @@ def _ast_size(value) -> int:
     return 0
 
 
+_MACRO_LET_RE = re.compile(r"%let\s+(\w+)\s*=\s*(.*?);", re.IGNORECASE | re.DOTALL)
+_MACRO_REF_RE = re.compile(r"&([A-Za-z_]\w*)\.?")
+_MACRO_BLOCK_RE = re.compile(
+    r"%macro\s+\w+\s*(?:\([^)]*\))?\s*;.*?%mend\b\s*;?",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _resolve_macro_value(value: str, macros: dict[str, str]) -> str:
+    """Resolve a %LET value against definitions already seen in the project."""
+    for _ in range(8):
+        updated = _MACRO_REF_RE.sub(lambda m: macros.get(m.group(1).lower(), m.group(0)), value)
+        if updated == value:
+            break
+        value = updated
+    return value.strip()
+
+
+def _resolve_project_macros(programs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Apply sequential %LET scope across programs before regllm parses them.
+
+    SAS projects commonly redefine a reference such as ``&PREFIX`` between
+    programs. Resolving each statement in source order prevents a later value
+    from leaking backwards into an earlier table reference.
+    """
+    macros: dict[str, str] = {}
+    resolved: list[tuple[str, str]] = []
+    for filename, code in programs:
+        protected = list(_MACRO_BLOCK_RE.finditer(code))
+        chunks: list[str] = []
+        cursor = 0
+
+        def resolve_segment(segment: str) -> str:
+            nonlocal macros
+            pieces: list[str] = []
+            segment_cursor = 0
+            for match in _MACRO_LET_RE.finditer(segment):
+                before = segment[segment_cursor:match.start()]
+                pieces.append(_MACRO_REF_RE.sub(
+                    lambda m: macros.get(m.group(1).lower(), m.group(0)), before,
+                ))
+                value = _resolve_macro_value(match.group(2), macros)
+                macros[match.group(1).lower()] = value
+                pieces.append(f"%let {match.group(1)} = {value};")
+                segment_cursor = match.end()
+            pieces.append(_MACRO_REF_RE.sub(
+                lambda m: macros.get(m.group(1).lower(), m.group(0)), segment[segment_cursor:],
+            ))
+            return "".join(pieces)
+
+        for block in protected:
+            chunks.append(resolve_segment(code[cursor:block.start()]))
+            chunks.append(block.group(0))
+            cursor = block.end()
+        chunks.append(resolve_segment(code[cursor:]))
+        resolved.append((filename, "".join(chunks)))
+    return resolved
+
+
+def _build_summary(
+    tables: dict[str, dict], order: list[str], edges: list[dict], final_tables: list[str],
+) -> tuple[list[str], list[str], str]:
+    relevant = set(final_tables)
+    inputs_by_target: dict[str, set[str]] = {}
+    for edge in edges:
+        inputs_by_target.setdefault(edge["target"], set()).add(edge["source"])
+    pending = list(final_tables)
+    while pending:
+        current = pending.pop()
+        for source in inputs_by_target.get(current, set()):
+            if source not in relevant:
+                relevant.add(source)
+                pending.append(source)
+
+    flow_edges = [
+        edge for edge in edges
+        if edge["source"] in relevant and edge["target"] in relevant
+    ]
+    lines = [
+        "RESUMEN DEL FLUJO FINAL",
+        f"Tablas finales inferidas: {', '.join(final_tables) if final_tables else '(ninguna)'}",
+        f"Tablas relevantes: {len(relevant)} de {len(tables)}",
+        "\nFLUJO DE TABLAS (orden de referencia):",
+    ]
+    if flow_edges:
+        for edge in flow_edges:
+            lines.append(f"  {edge['source']} -> {edge['target']} [{edge['kind']}]")
+    else:
+        lines.append("  (sin relaciones entre tablas)")
+
+    lines.append("\nCAMINOS HACIA LAS TABLAS FINALES:")
+    for final in final_tables:
+        lines.append(f"  salida: {final}")
+        path_seen: set[str] = set()
+        path_pending = [final]
+        while path_pending:
+            target = path_pending.pop()
+            if target in path_seen:
+                continue
+            path_seen.add(target)
+            sources = sorted(inputs_by_target.get(target, set()))
+            if sources:
+                lines.append(f"    {', '.join(sources)} -> {target}")
+                path_pending.extend(sources)
+
+    for name in order:
+        if name not in relevant:
+            continue
+        table = tables[name]
+        inputs = ", ".join(table["inputs"]) or "fuente externa/semilla"
+        lines.append(f"\n{name} [{table['role']}] <- {inputs}")
+        if table["definedIn"]:
+            lines.append(f"  definido en: {table['definedIn']} ({table['join'] or 'SET'})")
+        if table["byKeys"]:
+            lines.append(f"  BY: {', '.join(table['byKeys'])}")
+        for condition in table["filters"]:
+            lines.append(f"  filtro: {condition}")
+        lines.append(f"  campos: {', '.join(table['fields']) if table['fields'] else '(no inferidos)'}")
+        for field in table["newFields"]:
+            lines.append(f"  campo nuevo: {field['var']} = {field['expr']}")
+    return final_tables, [name for name in order if name in relevant], "\n".join(lines) + "\n"
+
+
+@lru_cache(maxsize=4)
+def _load_gguf_model(path: str):
+    if not path:
+        return None
+    try:
+        from llama_cpp import Llama
+
+        return Llama(
+            model_path=path,
+            n_ctx=int(os.environ.get("GGUF_N_CTX", "4096")),
+            n_threads=int(os.environ.get("GGUF_THREADS", "4")),
+            verbose=False,
+        )
+    except Exception:
+        return None
+
+
+def _resolve_final_tables(
+    tables: dict[str, dict], order: list[str], edges: list[dict], warnings: list[str],
+) -> list[str]:
+    candidates = [name for name in order if tables[name]["role"] == "final"]
+    if len(candidates) <= 1:
+        return candidates
+
+    # Deterministic fallback: preserve source order and select the last terminal
+    # derived table when no scoped resolver can make a validated decision.
+    fallback = candidates[-1]
+    model = _load_gguf_model(os.environ.get("GGUF_MODEL_PATH", "").strip())
+    if model is None:
+        if os.environ.get("GGUF_MODEL_PATH"):
+            warnings.append("No se pudo cargar el modelo GGUF; se usa la tabla final determinista.")
+        return [fallback]
+
+    inputs_by_target: dict[str, list[str]] = {}
+    for edge in edges:
+        inputs_by_target.setdefault(edge["target"], []).append(edge["source"])
+    context = {
+        "candidates": candidates,
+        "evidence": [
+            {
+                "table": name,
+                "definedIn": tables[name]["definedIn"],
+                "join": tables[name]["join"],
+                "inputs": inputs_by_target.get(name, []),
+                "fields": tables[name]["fields"][:30],
+            }
+            for name in candidates
+        ],
+    }
+    prompt = (
+        "Choose the single most likely final output table from the candidates. "
+        "Use only the supplied evidence. Return JSON exactly as "
+        '{"decision":"CANDIDATE","confidence":0.0,"reason":"short reason"}.\n\n'
+        + json.dumps(context, ensure_ascii=True)
+    )
+    try:
+        response = model.create_chat_completion(
+            messages=[
+                {"role": "system", "content": "You resolve one narrow data-lineage ambiguity."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0,
+            top_p=1,
+            seed=42,
+            max_tokens=160,
+            response_format={"type": "json_object"},
+        )
+        content = response["choices"][0]["message"]["content"]
+        decision = json.loads(content)
+        selected = decision.get("decision")
+        confidence = float(decision.get("confidence", 0))
+        if selected in candidates and confidence >= 0.75:
+            warnings.append(f"Resolutor GGUF seleccionó {selected} entre {len(candidates)} tablas finales.")
+            return [selected]
+        warnings.append("El resolutor GGUF no dio una decisión válida; se usa la tabla final determinista.")
+    except Exception as exc:  # noqa: BLE001 — ambiguity resolution must never block analysis
+        warnings.append(f"Falló el resolutor GGUF ({exc}); se usa la tabla final determinista.")
+    return [fallback]
+
+
 def _collect_events(body, assigns, conditions, events):
     """Statement-ordered read/write events + assignments + branch conditions."""
     for node in body:
@@ -168,6 +374,7 @@ def analyze(
     on_progress: Callable[[int, int, str, int], None] | None = None,
 ) -> dict:
     """programs: list of (name, sas_code). Returns the frontend Schema dict."""
+    programs = _resolve_project_macros(programs)
     tree = SASLogicTree()
     tables: dict[str, dict] = {}
     order: list[str] = []
@@ -366,6 +573,10 @@ def analyze(
         for t in tables.values()
         for src in t["inputs"]
     ]
+    final_tables = _resolve_final_tables(tables, order, table_edges, warnings)
+    final_tables, relevant_tables, summary_text = _build_summary(
+        tables, order, table_edges, final_tables,
+    )
 
     if on_progress:
         on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)
@@ -423,4 +634,7 @@ def analyze(
         "fieldEdges": field_edges,
         "warnings": warnings,
         "engine": "regllm",
+        "finalTables": final_tables,
+        "relevantTables": relevant_tables,
+        "summaryText": summary_text,
     }

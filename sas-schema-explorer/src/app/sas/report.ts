@@ -20,7 +20,16 @@ export function buildReport(schema: Schema): string {
     'Ficheros: ' + schema.files.join(', '),
     bar,
   );
+  if (schema.summaryText) {
+    L.push('', schema.summaryText.trim(), bar);
+  }
+  L.push('', 'GRAFO COMPLETO DE TABLAS:');
+  for (const edge of schema.tableEdges) {
+    L.push(`  ${edge.source} -> ${edge.target} [${edge.kind}]`);
+  }
+  const relevant = schema.relevantTables?.length ? new Set(schema.relevantTables) : null;
   for (const t of schema.tables) {
+    if (relevant && !relevant.has(t.name)) continue;
     const fmap = new Map<string, string[]>();
     for (const a of t.newFields) {
       const list = fmap.get(a.var) ?? [];

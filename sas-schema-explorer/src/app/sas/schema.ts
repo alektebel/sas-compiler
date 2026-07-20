@@ -61,6 +61,9 @@ export interface Schema {
   engine?: string;
   /** True only when the backend completed without compiler warnings. */
   compiled?: boolean;
+  finalTables?: string[];
+  relevantTables?: string[];
+  summaryText?: string;
 }
 
 export function buildSchema(files: SourceFile[]): Schema {
