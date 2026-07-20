@@ -39,6 +39,19 @@ function labelMap(projectXml: string): Map<string, string> {
   return map;
 }
 
+function xmlCode(bytes: Uint8Array): string | null {
+  try {
+    const doc = new DOMParser().parseFromString(decode(bytes), 'text/xml');
+    for (const el of Array.from(doc.getElementsByTagName('*'))) {
+      const text = el.textContent?.trim() ?? '';
+      if (/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(text)) return text;
+    }
+  } catch {
+    /* best effort only */
+  }
+  return null;
+}
+
 export async function readEgp(file: File): Promise<SourceFile[]> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const out: SourceFile[] = [];
@@ -68,8 +81,11 @@ export async function readEgp(file: File): Promise<SourceFile[]> {
   if (!out.length) {
     for (const name of Object.keys(zip.files)) {
       const e = zip.files[name];
-      if (e.dir || /\.(xml|png|jpg|gif|sas7bdat|log|lst)$/i.test(name)) continue;
-      const content = decode(await e.async('uint8array'));
+      if (/(^|\/)project\.xml$/i.test(name)) continue;
+      if (e.dir || /\.(png|jpg|gif|sas7bdat|log|lst)$/i.test(name)) continue;
+      const bytes = await e.async('uint8array');
+      const content = /\.xml$/i.test(name) ? xmlCode(bytes) : decode(bytes);
+      if (!content) continue;
       if (/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(content)) {
         out.push({ name: `${file.name} › ${name.split('/').pop() ?? name}`, content, origin: 'egp' });
       }

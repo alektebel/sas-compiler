@@ -50,7 +50,7 @@
   }
 </div>
 
-@if (state.analyzing()) {
+@if (state.analyzing() && state.analysisTotal() > 0) {
   <div class="compile-progress" role="status" aria-live="polite">
     <div class="compile-progress-head">
       <span>
@@ -63,6 +63,12 @@
          [attr.aria-valuetext]="state.analysisProcessed() + ' caracteres procesados de ' + state.analysisTotal()">
       <div class="compile-fill" [style.width.%]="state.analysisProgress()"></div>
     </div>
+  </div>
+}
+
+@if (state.analyzing() && state.analysisTotal() === 0) {
+  <div class="compile-progress" role="status" aria-live="polite">
+    <span>{{ state.analysisStage() }}: todavía no se encontraron programas SAS extraíbles.</span>
   </div>
 }
 

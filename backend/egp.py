@@ -35,6 +35,19 @@ def _labels(project_xml: str) -> dict[str, str]:
     return out
 
 
+def _xml_code(data: bytes) -> str | None:
+    """Return SAS text stored in an XML code element, when present."""
+    try:
+        root = ET.fromstring(_decode(data))
+    except ET.ParseError:
+        return None
+    for element in root.iter():
+        text = "".join(element.itertext()).strip()
+        if re.search(r"\b(data\s+[\w.]+\s*;|proc\s+\w+)", text, re.I):
+            return text
+    return None
+
+
 def extract_egp(name: str, data: bytes) -> list[tuple[str, str]]:
     """Return [(program_name, sas_code)] from an .egp payload."""
     programs: list[tuple[str, str]] = []
@@ -54,9 +67,14 @@ def extract_egp(name: str, data: bytes) -> list[tuple[str, str]]:
 
         if not programs:  # older EGPs store code in .txt or extension-less entries
             for entry in z.namelist():
-                if entry.endswith("/") or re.search(r"\.(xml|png|jpg|gif|sas7bdat|log|lst)$", entry, re.I):
+                if re.search(r"(^|/)project\.xml$", entry, re.I):
                     continue
-                code = _decode(z.read(entry))
+                if entry.endswith("/") or re.search(r"\.(png|jpg|gif|sas7bdat|log|lst)$", entry, re.I):
+                    continue
+                raw = z.read(entry)
+                code = _xml_code(raw) if entry.lower().endswith(".xml") else _decode(raw)
+                if not code:
+                    continue
                 if re.search(r"\b(data\s+[\w.]+\s*;|proc\s+\w+)", code, re.I):
                     programs.append((f"{name} › {entry.rsplit('/', 1)[-1]}", code))
     return programs
