@@ -39,17 +39,21 @@ function labelMap(projectXml: string): Map<string, string> {
   return map;
 }
 
-function xmlCode(bytes: Uint8Array): string | null {
+function xmlCodes(bytes: Uint8Array): string[] {
+  const codes: string[] = [];
   try {
     const doc = new DOMParser().parseFromString(decode(bytes), 'text/xml');
     for (const el of Array.from(doc.getElementsByTagName('*'))) {
+      const children = Array.from(el.children);
+      const tag = el.localName.toLowerCase();
+      if (children.length && !['code', 'sourcecode', 'sascode', 'program', 'programcode'].includes(tag)) continue;
       const text = el.textContent?.trim() ?? '';
-      if (/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(text)) return text;
+      if (/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(text)) codes.push(text);
     }
   } catch {
     /* best effort only */
   }
-  return null;
+  return codes;
 }
 
 export async function readEgp(file: File): Promise<SourceFile[]> {
@@ -81,13 +85,13 @@ export async function readEgp(file: File): Promise<SourceFile[]> {
   if (!out.length) {
     for (const name of Object.keys(zip.files)) {
       const e = zip.files[name];
-      if (/(^|\/)project\.xml$/i.test(name)) continue;
       if (e.dir || /\.(png|jpg|gif|sas7bdat|log|lst)$/i.test(name)) continue;
       const bytes = await e.async('uint8array');
-      const content = /\.xml$/i.test(name) ? xmlCode(bytes) : decode(bytes);
-      if (!content) continue;
-      if (/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(content)) {
-        out.push({ name: `${file.name} › ${name.split('/').pop() ?? name}`, content, origin: 'egp' });
+      const contents = /\.xml$/i.test(name) ? xmlCodes(bytes) : [decode(bytes)];
+      for (const [index, content] of contents.entries()) {
+        if (!/\b(data\s+[\w.]+\s*;|proc\s+\w+)/i.test(content)) continue;
+        const suffix = contents.length > 1 ? ` #${index + 1}` : '';
+        out.push({ name: `${file.name} › ${name.split('/').pop() ?? name}${suffix}`, content, origin: 'egp' });
       }
     }
   }

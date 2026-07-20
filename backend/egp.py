@@ -35,17 +35,22 @@ def _labels(project_xml: str) -> dict[str, str]:
     return out
 
 
-def _xml_code(data: bytes) -> str | None:
-    """Return SAS text stored in an XML code element, when present."""
+def _xml_codes(data: bytes) -> list[str]:
+    """Return SAS text stored in XML code elements, when present."""
+    codes: list[str] = []
     try:
         root = ET.fromstring(_decode(data))
     except ET.ParseError:
-        return None
+        return codes
     for element in root.iter():
+        tag = element.tag.rsplit("}", 1)[-1].lower()
+        children = list(element)
+        if children and tag not in {"code", "sourcecode", "sascode", "program", "programcode"}:
+            continue
         text = "".join(element.itertext()).strip()
         if re.search(r"\b(data\s+[\w.]+\s*;|proc\s+\w+)", text, re.I):
-            return text
-    return None
+            codes.append(text)
+    return codes
 
 
 def extract_egp(name: str, data: bytes) -> list[tuple[str, str]]:
@@ -67,14 +72,13 @@ def extract_egp(name: str, data: bytes) -> list[tuple[str, str]]:
 
         if not programs:  # older EGPs store code in .txt or extension-less entries
             for entry in z.namelist():
-                if re.search(r"(^|/)project\.xml$", entry, re.I):
-                    continue
                 if entry.endswith("/") or re.search(r"\.(png|jpg|gif|sas7bdat|log|lst)$", entry, re.I):
                     continue
                 raw = z.read(entry)
-                code = _xml_code(raw) if entry.lower().endswith(".xml") else _decode(raw)
-                if not code:
-                    continue
-                if re.search(r"\b(data\s+[\w.]+\s*;|proc\s+\w+)", code, re.I):
-                    programs.append((f"{name} › {entry.rsplit('/', 1)[-1]}", code))
+                is_xml = entry.lower().endswith(".xml")
+                codes = _xml_codes(raw) if is_xml else [_decode(raw)]
+                for index, code in enumerate(codes, 1):
+                    if re.search(r"\b(data\s+[\w.]+\s*;|proc\s+\w+)", code, re.I):
+                        suffix = f" #{index}" if len(codes) > 1 else ""
+                        programs.append((f"{name} › {entry.rsplit('/', 1)[-1]}{suffix}", code))
     return programs
