@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -48,11 +49,54 @@ from src.sas_logic_tree import (  # noqa: E402
     DoLoopNode,
     FilterNode,
     IfNode,
+    MacroDefNode,
     ProcNode,
     SASLogicTree,
+    _LineageWalker,
     SelectNode,
     _vars_in_expr,
 )
+
+
+class _ProgressLineageWalker(_LineageWalker):
+    """Lineage walker that reports traversal progress without changing regllm."""
+
+    def __init__(self, total: int, report: Callable[[int], None]) -> None:
+        super().__init__()
+        self._total = max(total, 1)
+        self._processed = 0
+        self._report = report
+
+    def _tick(self, amount: int = 1) -> None:
+        self._processed = min(self._processed + amount, self._total)
+        self._report(self._processed)
+
+    def walk(self, nodes):
+        for node in nodes:
+            if isinstance(node, DataStepNode):
+                self._current_step = node.output_dataset
+                if node.output_dataset not in self._step_order:
+                    self._step_order.append(node.output_dataset)
+                for _ in node.merge_datasets:
+                    self._read.update()
+                self._walk_body(node.body)
+            elif isinstance(node, ProcNode) and node.output_table and node.select_fields:
+                self._current_step = node.output_table
+                if node.output_table not in self._step_order:
+                    self._step_order.append(node.output_table)
+                self._walk_proc_sql(node)
+            elif isinstance(node, MacroDefNode):
+                self.walk(node.body)
+            self._tick()
+        return self._build()
+
+    def _walk_node(self, node) -> None:
+        super()._walk_node(node)
+        self._tick()
+
+    def _walk_proc_sql(self, node) -> None:
+        super()._walk_proc_sql(node)
+        self._tick(len(node.select_fields))
 
 
 def _norm(name: str) -> str:
@@ -71,6 +115,14 @@ def _is_field(name: str) -> bool:
 
 def _clean(names) -> set[str]:
     return {n for n in names if _is_field(n)}
+
+
+def _ast_size(value) -> int:
+    if isinstance(value, list):
+        return sum(_ast_size(item) for item in value)
+    if hasattr(value, "__dataclass_fields__"):
+        return 1 + sum(_ast_size(getattr(value, name)) for name in value.__dataclass_fields__)
+    return 0
 
 
 def _collect_events(body, assigns, conditions, events):
@@ -121,6 +173,7 @@ def analyze(
     order: list[str] = []
     events_by_table: dict[str, list] = {}
     warnings: list[str] = []
+    parsed_nodes: list = []
     total_chars = sum(len(code) for _, code in programs)
     processed_chars = 0
 
@@ -162,6 +215,7 @@ def analyze(
             report(fname)
             continue
 
+        parsed_nodes.extend(nodes)
         processed_chars += len(code)
         report(fname)
 
@@ -317,10 +371,31 @@ def analyze(
         on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)
 
     # ── Field lineage straight from the compiler ─────────────────────
-    full = tree.parse("\n".join(code for _, code in programs))
-    lineage = tree.lineage(full)
-    if on_progress:
-        on_progress(total_chars, total_chars, "Finalizando resultado", 98)
+    lineage_total = _ast_size(parsed_nodes)
+    lineage_started = time.monotonic()
+    last_report = lineage_started
+    report_every = max(1000, lineage_total // 100)
+
+    def report_lineage(processed: int) -> None:
+        nonlocal last_report
+        now = time.monotonic()
+        if processed < lineage_total and processed % report_every != 0:
+            return
+        elapsed = now - lineage_started
+        rate = processed / elapsed if elapsed > 0 else 0
+        remaining = max(lineage_total - processed, 0) / rate if rate else 0
+        eta = f", quedan aprox. {remaining:.0f}s" if remaining else ""
+        overall = 90 + round(8 * processed / max(lineage_total, 1))
+        if on_progress:
+            on_progress(
+                processed_chars,
+                total_chars,
+                f"Linaje de campos: {processed:,}/{lineage_total:,} elementos{eta}",
+                min(overall, 98),
+            )
+        last_report = now
+
+    lineage = _ProgressLineageWalker(lineage_total, report_lineage).walk(parsed_nodes)
     field_nodes = [
         {"id": n["id"], "kind": n.get("kind", "computed")}
         for n in lineage.nodes
@@ -337,6 +412,8 @@ def analyze(
         for e in lineage.edges
         if _is_field(e["source"].upper()) and _is_field(e["target"].upper())
     ]
+    if on_progress:
+        on_progress(total_chars, total_chars, "Finalizando resultado", 100)
 
     return {
         "files": [name for name, _ in programs],
