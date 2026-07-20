@@ -54,14 +54,13 @@
   <div class="compile-progress" role="status" aria-live="polite">
     <div class="compile-progress-head">
       <span>
-        {{ state.analysisPhase() === 'compiling' ? 'Compilando con regllm…' :
-           state.analysisPhase() === 'local' ? 'Analizando localmente…' : 'Preparando ficheros…' }}
+        {{ state.analysisStage() }}
       </span>
-      <span>{{ state.analysisProgress() }}%</span>
+      <span>{{ state.analysisProcessed() | number }} / {{ state.analysisTotal() | number }} caracteres</span>
     </div>
     <div class="compile-track" role="progressbar" [attr.aria-valuenow]="state.analysisProgress()"
          aria-valuemin="0" aria-valuemax="100"
-         [class.indeterminate]="state.analysisPhase() === 'compiling'">
+         [attr.aria-valuetext]="state.analysisProcessed() + ' caracteres procesados de ' + state.analysisTotal()">
       <div class="compile-fill" [style.width.%]="state.analysisProgress()"></div>
     </div>
   </div>

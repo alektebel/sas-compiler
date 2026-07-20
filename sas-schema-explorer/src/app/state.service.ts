@@ -24,6 +24,9 @@ export class StateService {
   readonly analyzing = signal(false);
   readonly analysisPhase = signal<AnalysisPhase>('idle');
   readonly analysisProgress = signal(0);
+  readonly analysisProcessed = signal(0);
+  readonly analysisTotal = signal(0);
+  readonly analysisStage = signal('Preparando programas');
   readonly analysisResult = signal<AnalysisResult>('idle');
   readonly view = signal<View>('tabla');
   readonly selectedTable = signal<string | null>(null);
@@ -91,6 +94,9 @@ export class StateService {
     this.loadError.set(null);
     this.analysisPhase.set('idle');
     this.analysisProgress.set(0);
+    this.analysisProcessed.set(0);
+    this.analysisTotal.set(0);
+    this.analysisStage.set('Preparando programas');
     this.analysisResult.set('idle');
   }
 
@@ -109,10 +115,12 @@ export class StateService {
     this.analyzing.set(true);
     this.analysisResult.set('running');
     this.analysisPhase.set('preparing');
-    this.analysisProgress.set(12);
+    this.analysisProgress.set(0);
+    this.analysisProcessed.set(0);
+    this.analysisTotal.set(0);
+    this.analysisStage.set('Preparando programas');
     try {
       this.analysisPhase.set('compiling');
-      this.analysisProgress.set(25);
       const schema = await this.analyzeRemote(files);
       this.schema.set(schema);
       this.engine.set('regllm');
@@ -120,7 +128,7 @@ export class StateService {
     } catch {
       try {
         this.analysisPhase.set('local');
-        this.analysisProgress.set(55);
+        this.analysisStage.set('Analizando localmente');
         const schema = await this.analyzeLocal(files);
         schema.warnings = [
           'Backend no disponible — análisis local aproximado (sin expansión de macros). ' +
@@ -151,18 +159,63 @@ export class StateService {
     }
     const res = await fetch(API_ANALYZE, { method: 'POST', body: form });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as Schema;
+    if (!res.body) throw new Error('La respuesta no contiene progreso de compilación');
+
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = '';
+    while (true) {
+      const chunk = await reader.read();
+      buffer += chunk.value ?? '';
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as {
+          type: string;
+          processed?: number;
+          total?: number;
+          stage?: string;
+          result?: Schema;
+          message?: string;
+        };
+        if (event.type === 'progress') {
+          const processed = event.processed ?? 0;
+          const total = event.total ?? 0;
+          this.analysisProcessed.set(processed);
+          this.analysisTotal.set(total);
+          this.analysisProgress.set(total ? Math.round((processed / total) * 100) : 100);
+          this.analysisStage.set(event.stage ?? 'Compilando programa');
+        } else if (event.type === 'result' && event.result) {
+          return event.result;
+        } else if (event.type === 'error') {
+          throw new Error(event.message ?? 'Error de compilación');
+        }
+      }
+      if (chunk.done) break;
+    }
+    throw new Error('La compilación no devolvió un resultado');
   }
 
   private async analyzeLocal(files: LoadedFile[]): Promise<Schema> {
     const sources: SourceFile[] = [];
+    let total = 0;
     for (const f of files) {
       if (f.origin === 'egp') {
-        sources.push(...(await readEgp(new File([f.blob], f.name))));
+        const extracted = await readEgp(new File([f.blob], f.name));
+        sources.push(...extracted);
+        total += extracted.reduce((sum, source) => sum + source.content.length, 0);
       } else {
-        sources.push({ name: f.name, content: await f.blob.text(), origin: f.origin });
+        const content = await f.blob.text();
+        sources.push({ name: f.name, content, origin: f.origin });
+        total += content.length;
       }
+      const processed = sources.reduce((sum, source) => sum + source.content.length, 0);
+      this.analysisTotal.set(total);
+      this.analysisProcessed.set(processed);
+      this.analysisProgress.set(total ? Math.round((processed / total) * 100) : 100);
+      this.analysisStage.set(`Preparando ${f.name}`);
     }
+    this.analysisStage.set('Generando tablas y linaje');
     return buildSchema(sources);
   }
 

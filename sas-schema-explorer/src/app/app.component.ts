@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { StateService, View } from './state.service';
 import { TableViewComponent } from './table-view.component';
@@ -8,7 +9,7 @@ import { buildReport } from './sas/report';
 
 @Component({
   selector: 'app-root',
-  imports: [TableViewComponent, FlowViewComponent, LineageViewComponent],
+  imports: [DecimalPipe, TableViewComponent, FlowViewComponent, LineageViewComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent {

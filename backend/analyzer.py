@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Callable
 
 _REGLLM_CANDIDATES = [
     os.environ.get("REGLLM_PATH", ""),
@@ -110,13 +111,25 @@ def _collect_filters(body, out):
             _collect_filters(node.body, out)
 
 
-def analyze(programs: list[tuple[str, str]]) -> dict:
+def analyze(
+    programs: list[tuple[str, str]],
+    on_progress: Callable[[int, int, str], None] | None = None,
+) -> dict:
     """programs: list of (name, sas_code). Returns the frontend Schema dict."""
     tree = SASLogicTree()
     tables: dict[str, dict] = {}
     order: list[str] = []
     events_by_table: dict[str, list] = {}
     warnings: list[str] = []
+    total_chars = sum(len(code) for _, code in programs)
+    processed_chars = 0
+
+    def report(filename: str) -> None:
+        if on_progress:
+            on_progress(processed_chars, total_chars, f"Analizando {filename}")
+
+    if on_progress:
+        on_progress(0, total_chars, "Preparando programas")
 
     def get_table(name: str) -> dict:
         key = _norm(name)
@@ -144,7 +157,12 @@ def analyze(programs: list[tuple[str, str]]) -> dict:
             nodes = tree.parse(code)
         except Exception as e:  # noqa: BLE001 — surface parse errors to the UI
             warnings.append(f"No se pudo analizar {fname}: {e}")
+            processed_chars += len(code)
+            report(fname)
             continue
+
+        processed_chars += len(code)
+        report(fname)
 
         for node in nodes:
             if isinstance(node, DataStepNode):
@@ -291,6 +309,8 @@ def analyze(programs: list[tuple[str, str]]) -> dict:
     # ── Field lineage straight from the compiler ─────────────────────
     full = tree.parse("\n".join(code for _, code in programs))
     lineage = tree.lineage(full)
+    if on_progress:
+        on_progress(total_chars, total_chars, "Linaje y resultado final")
     field_nodes = [
         {"id": n["id"], "kind": n.get("kind", "computed")}
         for n in lineage.nodes

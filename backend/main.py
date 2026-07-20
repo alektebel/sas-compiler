@@ -11,11 +11,14 @@ Run:  REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
 
 from __future__ import annotations
 
+import json
+from queue import Queue
+from threading import Thread
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analyzer import REGLLM, analyze
@@ -71,10 +74,36 @@ async def analyze_endpoint(
         if code.strip():
             programs.append((f"pegado_{i}.sas", code))
 
-    result = analyze(programs)
-    result["warnings"] = warnings + result.get("warnings", [])
-    result["compiled"] = not result["warnings"]
-    return JSONResponse(result)
+    def events():
+        queue: Queue[dict | None] = Queue()
+
+        def progress(processed: int, total: int, stage: str) -> None:
+            queue.put({
+                "type": "progress",
+                "processed": processed,
+                "total": total,
+                "stage": stage,
+            })
+
+        def compile_programs() -> None:
+            try:
+                result = analyze(programs, on_progress=progress)
+                result["warnings"] = warnings + result.get("warnings", [])
+                result["compiled"] = not result["warnings"]
+                queue.put({"type": "result", "result": result})
+            except Exception as e:  # noqa: BLE001 — return compiler errors to the UI
+                queue.put({"type": "error", "message": str(e)})
+            finally:
+                queue.put(None)
+
+        Thread(target=compile_programs, daemon=True).start()
+        while True:
+            event = queue.get()
+            if event is None:
+                break
+            yield json.dumps(event) + "\n"
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
 _DIST = Path(__file__).resolve().parent.parent / "sas-schema-explorer" / "dist" / "sas-schema-explorer" / "browser"
