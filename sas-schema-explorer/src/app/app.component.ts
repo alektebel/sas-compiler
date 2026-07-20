@@ -54,10 +54,11 @@ export class AppComponent {
     this.dragOver.set(true);
   }
 
-  submitPaste(): void {
-    this.state.addPasted(this.pasteText());
+  async submitPaste(): Promise<void> {
+    const code = this.pasteText();
     this.pasteText.set('');
     this.pasteOpen.set(false);
+    await this.state.addPasted(code);
   }
 
   onPasteInput(ev: Event): void {

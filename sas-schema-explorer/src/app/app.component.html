@@ -1,7 +1,7 @@
 <header>
   <div class="brand">
     <h1>Explorador de esquemas SAS</h1>
-    <p>carga tus programas <code>.sas</code> o proyectos <code>.egp</code> — el análisis es 100% local, tu código no sale del navegador</p>
+    <p>carga tus programas <code>.sas</code> o proyectos <code>.egp</code> — analizados con el compilador regllm (backend) o localmente en el navegador</p>
   </div>
   <div class="stats">
     @for (st of stats(); track st.l) {
@@ -37,6 +37,16 @@
   </span>
   @if (state.files().length) {
     <button type="button" class="ghostbtn danger" (click)="state.clear()">Limpiar todo</button>
+  }
+  @if (state.analyzing()) {
+    <span class="drophint" role="status">Analizando…</span>
+  } @else if (state.engine()) {
+    <span class="engchip" [class.local]="state.engine() === 'local'"
+          [attr.title]="state.engine() === 'regllm'
+            ? 'Analizado por el backend con el compilador real de regllm (sas_logic_tree.py)'
+            : 'Backend no disponible: análisis local aproximado en el navegador'">
+      {{ state.engine() === 'regllm' ? '⚙ compilador regllm' : '≈ análisis local' }}
+    </span>
   }
 </div>
 
@@ -117,6 +127,7 @@
       </label>
       <button type="button" class="ghostbtn" (click)="pasteOpen.set(true)">o pegar código</button>
     </div>
-    <p class="privacy">El análisis se ejecuta íntegramente en tu navegador: ningún fichero se sube a ningún servidor.</p>
+    <p class="privacy">Con el backend arrancado, el análisis usa el compilador real de regllm en tu máquina;
+      sin backend, un analizador aproximado se ejecuta en el navegador. En ningún caso el código sale de tu equipo.</p>
   </div>
 }

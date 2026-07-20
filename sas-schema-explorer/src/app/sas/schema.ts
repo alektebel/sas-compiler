@@ -57,6 +57,8 @@ export interface Schema {
   fieldNodes: FieldNode[];
   fieldEdges: FieldEdge[];
   warnings: string[];
+  /** which analyzer produced this: 'regllm' (backend) or 'local' (TS port) */
+  engine?: string;
 }
 
 export function buildSchema(files: SourceFile[]): Schema {

@@ -1,8 +1,8 @@
 # Explorador de esquemas SAS
 
-## La aplicación: `sas-schema-explorer/` (Angular)
+## La aplicación: Angular + backend FastAPI
 
-Aplicación Angular donde cargas **tus propios** programas `.sas` o proyectos de
+Aplicación donde cargas **tus propios** programas `.sas` o proyectos de
 Enterprise Guide `.egp` (también puedes pegar código) y explora:
 
 - todas las tablas (pasos DATA, MERGE, PROC SQL, DATALINES) con su rol,
@@ -13,21 +13,38 @@ Enterprise Guide `.egp` (también puedes pegar código) y explora:
   cada relación);
 - descarga del inventario completo en texto plano.
 
-Todo el análisis (incluida la descompresión de los `.egp`, que son archivos
-ZIP con los programas embebidos) se ejecuta **en el navegador**: el código SAS
-no se sube a ningún servidor.
+### Backend (`backend/`) — el compilador real de regllm
+
+El backend FastAPI importa directamente `src/sas_logic_tree.py` del
+repositorio [`alektebel/regllm`](https://github.com/alektebel/regllm), con
+expansión de macros (`%MACRO`/`%LET`), y descomprime los `.egp` (archivos ZIP
+con los programas embebidos) en el servidor. También sirve el frontend
+compilado, así que un solo proceso lo ejecuta todo:
+
+```bash
+# requisitos: un clon de alektebel/regllm
+pip install -r backend/requirements.txt
+cd sas-schema-explorer && npm install && npx ng build && cd ..
+REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
+# → abre http://localhost:8000
+```
+
+API: `POST /api/analyze` (multipart: `files` = .sas/.egp, `pasted` = código) →
+JSON con tablas, campos y linaje. `GET /api/health` para comprobar el estado.
+
+### Frontend (`sas-schema-explorer/`, Angular 19)
 
 ```bash
 cd sas-schema-explorer
 npm install
-npx ng serve            # desarrollo en http://localhost:4200
-npm run build:single    # produce dist/sas-schema-explorer/single/index.html,
-                        # un único HTML autocontenido que se abre con doble clic
+npm start               # ng serve con proxy /api → localhost:8000
+npm run build:single    # único HTML autocontenido (solo análisis local)
 ```
 
-El parser TypeScript (`src/app/sas/`) es un port del subconjunto de extracción
-del compilador SAS de [`alektebel/regllm`](https://github.com/alektebel/regllm)
-(`src/sas_logic_tree.py`).
+El frontend llama primero al backend (chip «⚙ compilador regllm»); si no está
+disponible, usa un port TypeScript aproximado del subconjunto de extracción
+(`src/app/sas/`, chip «≈ análisis local», sin expansión de macros). En ambos
+casos el código SAS no sale de tu equipo.
 
 ## Versión estática original (raíz del repo)
 
