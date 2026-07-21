@@ -187,6 +187,14 @@ def _resolve_project_macros(programs: list[tuple[str, str]]) -> list[tuple[str, 
     return resolved
 
 
+def _are_valid_gguf_descriptions(value, expected: set[str]) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == expected
+        and all(isinstance(value[name], str) and value[name].strip() for name in expected)
+    )
+
+
 def _build_summary(
     tables: dict[str, dict], order: list[str], edges: list[dict], final_tables: list[str],
 ) -> tuple[list[str], list[str], list[dict], str]:
@@ -268,7 +276,15 @@ def _build_summary(
 def _clean_flow_with_gguf(
     flow: dict, tables: dict[str, dict], warnings: list[str],
 ) -> dict:
-    """Use GGUF only to order the deterministic table set and explain it."""
+    """Use GGUF only to describe and order the deterministic table set."""
+    descriptions = {
+        name: (
+            f"{name} se alimenta de {', '.join(tables[name]['inputs']) or 'una fuente externa'} "
+            f"y se genera mediante {tables[name]['join'] or 'un paso SAS'}."
+        )
+        for name in flow["tables"]
+    }
+    flow = {**flow, "descriptions": descriptions}
     model = _load_gguf_model(os.environ.get("GGUF_MODEL_PATH", "").strip())
     if model is None:
         return flow
@@ -286,10 +302,12 @@ def _clean_flow_with_gguf(
         "edges": flow["edges"],
     }
     prompt = (
-        "Summarize this one data flow. Return JSON exactly with an ordered "
-        "tables array containing every supplied table exactly once, and one "
-        "short Spanish sentence explaining why the final table is created and "
-        "what it includes differently. Do not invent tables.\n\n"
+        "Resume este flujo de datos. Devuelve exactamente JSON con un array "
+        "'tables' que contenga cada tabla suministrada una sola vez y un objeto "
+        "'descriptions' con una frase corta en español para cada tabla. Incluye "
+        "también una frase corta 'explanation' que explique por qué se crea la "
+        "tabla final y qué incluye de forma diferente. No inventes tablas ni "
+        "datos; usa solo la información suministrada.\n\n"
         + json.dumps(context, ensure_ascii=True)
     )
     try:
@@ -301,12 +319,13 @@ def _clean_flow_with_gguf(
             temperature=0,
             top_p=1,
             seed=42,
-            max_tokens=180,
+            max_tokens=320,
             response_format={"type": "json_object"},
         )
         data = json.loads(response["choices"][0]["message"]["content"])
         ordered = data.get("tables")
         explanation = data.get("explanation")
+        generated = data.get("descriptions")
         expected = set(flow["tables"])
         if (
             isinstance(ordered, list)
@@ -314,8 +333,14 @@ def _clean_flow_with_gguf(
             and len(ordered) == len(expected)
             and isinstance(explanation, str)
             and explanation.strip()
+            and _are_valid_gguf_descriptions(generated, expected)
         ):
-            return {**flow, "tables": ordered, "explanation": explanation.strip()}
+            return {
+                **flow,
+                "tables": ordered,
+                "descriptions": {name: generated[name].strip() for name in expected},
+                "explanation": explanation.strip(),
+            }
         warnings.append("El resumen GGUF no conservó el grafo mínimo; se usa el resumen determinista.")
     except Exception as exc:  # noqa: BLE001 — optional summarization must not block analysis
         warnings.append(f"Falló el resumen GGUF ({exc}); se usa el resumen determinista.")
@@ -652,7 +677,11 @@ def analyze(
         _clean_flow_with_gguf(flow, tables, warnings) for flow in flow_summaries
     ]
     if flow_summaries and flow_summaries[0].get("explanation"):
-        summary_text += "\nEXPLICACION DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
+        summary_text += "\nEXPLICACIÓN DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
+    if flow_summaries and flow_summaries[0].get("descriptions"):
+        summary_text += "\nDESCRIPCIONES DE TABLAS:\n"
+        for name in flow_summaries[0]["tables"]:
+            summary_text += f"  {name}: {flow_summaries[0]['descriptions'][name]}\n"
 
     if on_progress:
         on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)
