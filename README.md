@@ -32,6 +32,29 @@ REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
 API: `POST /api/analyze` (multipart: `files` = .sas/.egp, `pasted` = código) →
 JSON con tablas, campos y linaje. `GET /api/health` para comprobar el estado.
 
+#### Descripciones de flujo con un modelo GGUF (opcional)
+
+El compilador siempre calcula el grafo, las tablas finales y sus entradas de
+forma determinista. Para añadir una frase corta en español a cada tabla del
+flujo final, instala la dependencia opcional y configura un modelo local:
+
+```bash
+pip install -r backend/requirements-gguf.txt
+export GGUF_MODEL_PATH=/ruta/al/modelo-instruct.gguf
+export GGUF_N_CTX=4096       # opcional
+export GGUF_THREADS=4        # opcional
+REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
+```
+
+El modelo se carga bajo demanda con `llama-cpp-python` y solo recibe los
+nombres de tablas, entradas, operaciones y campos necesarios para describir el
+flujo; el código SAS no se envía a ningún servicio externo. La salida del
+modelo se valida para impedir tablas inventadas o faltantes. Si no se define
+`GGUF_MODEL_PATH`, el modelo no está instalado o devuelve JSON inválido, la
+aplicación conserva el grafo determinista y genera descripciones de respaldo.
+En el flujo se muestran las tablas como `tabla [entradas] (descripción)` y la
+tabla final identificada.
+
 ### Frontend (`sas-schema-explorer/`, Angular 19)
 
 ```bash

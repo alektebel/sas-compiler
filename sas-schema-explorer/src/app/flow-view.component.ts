@@ -31,6 +31,21 @@ const PAD = 18;
   selector: 'app-flow-view',
   template: `
     <p class="meta">Flujo de datos entre tablas — pulsa un nodo para abrir su detalle. La franja de color indica el rol.</p>
+    @for (flow of state.schema()?.flowSummaries ?? []; track $index) {
+      <section class="flow-summary" aria-label="Resumen del flujo">
+        <h2>Flujo{{ flow.final ? ' → ' + flow.final : '' }}</h2>
+        @for (name of flow.tables; track name) {
+          <article class="flow-table">
+            <b>{{ name }}</b>
+            <span class="flow-inputs">[{{ inputNames(name) }}]</span>
+            <span class="flow-description">({{ flow.descriptions?.[name] ?? inputText(name) }})</span>
+          </article>
+        }
+        @if (flow.explanation) {
+          <p class="flow-final"><b>Tabla final:</b> {{ flow.final ?? 'no determinada' }} — {{ flow.explanation }}</p>
+        }
+      </section>
+    }
     <div class="gwrap">
       <svg [attr.viewBox]="'0 0 ' + w() + ' ' + h()" [attr.width]="w()" [attr.height]="h()"
            role="img" aria-label="Grafo de dependencias entre tablas">
@@ -67,6 +82,18 @@ export class FlowViewComponent {
   readonly hover = signal<string | null>(null);
   readonly nw = NW;
   readonly nh = NH;
+
+  inputText(name: string): string {
+    const table = this.state.schema()?.tables.find((t) => t.name === name);
+    return table
+      ? `${table.join ?? 'paso SAS'}; tabla identificada por el análisis determinista.`
+      : '';
+  }
+
+  inputNames(name: string): string {
+    const table = this.state.schema()?.tables.find((t) => t.name === name);
+    return table?.inputs.length ? table.inputs.join(', ') : 'fuente externa';
+  }
 
   private readonly layout = computed(() => {
     const s = this.state.schema();

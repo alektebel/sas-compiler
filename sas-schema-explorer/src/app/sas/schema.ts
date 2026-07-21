@@ -68,6 +68,7 @@ export interface Schema {
     tables: string[];
     edges: TableEdge[];
     explanation?: string;
+    descriptions?: Record<string, string>;
   }>;
   summaryText?: string;
 }
