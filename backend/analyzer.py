@@ -187,6 +187,14 @@ def _resolve_project_macros(programs: list[tuple[str, str]]) -> list[tuple[str, 
     return resolved
 
 
+def _valid_gguf_descriptions(value, expected: set[str]) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == expected
+        and all(isinstance(value[name], str) and value[name].strip() for name in expected)
+    )
+
+
 def _build_summary(
     tables: dict[str, dict], order: list[str], edges: list[dict], final_tables: list[str],
 ) -> tuple[list[str], list[str], list[dict], str]:
@@ -297,7 +305,7 @@ def _clean_flow_with_gguf(
         "Resume este flujo de datos. Devuelve exactamente JSON con un array "
         "'tables' que contenga cada tabla suministrada una sola vez y un objeto "
         "'descriptions' con una frase corta en español para cada tabla. Incluye "
-        "también una frase corta 'explanation' explicando por qué se crea la "
+        "también una frase corta 'explanation' que explique por qué se crea la "
         "tabla final y qué incluye de forma diferente. No inventes tablas ni "
         "datos; usa solo la información suministrada.\n\n"
         + json.dumps(context, ensure_ascii=True)
@@ -325,9 +333,7 @@ def _clean_flow_with_gguf(
             and len(ordered) == len(expected)
             and isinstance(explanation, str)
             and explanation.strip()
-            and isinstance(generated, dict)
-            and set(generated) == expected
-            and all(isinstance(generated[name], str) and generated[name].strip() for name in expected)
+            and _valid_gguf_descriptions(generated, expected)
         ):
             return {
                 **flow,
