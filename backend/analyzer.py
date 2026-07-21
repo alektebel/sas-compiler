@@ -187,7 +187,7 @@ def _resolve_project_macros(programs: list[tuple[str, str]]) -> list[tuple[str, 
     return resolved
 
 
-def _valid_gguf_descriptions(value, expected: set[str]) -> bool:
+def _are_valid_gguf_descriptions(value, expected: set[str]) -> bool:
     return (
         isinstance(value, dict)
         and set(value) == expected
@@ -333,7 +333,7 @@ def _clean_flow_with_gguf(
             and len(ordered) == len(expected)
             and isinstance(explanation, str)
             and explanation.strip()
-            and _valid_gguf_descriptions(generated, expected)
+            and _are_valid_gguf_descriptions(generated, expected)
         ):
             return {
                 **flow,
