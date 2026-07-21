@@ -677,7 +677,7 @@ def analyze(
         _clean_flow_with_gguf(flow, tables, warnings) for flow in flow_summaries
     ]
     if flow_summaries and flow_summaries[0].get("explanation"):
-        summary_text += "\nEXPLICACION DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
+        summary_text += "\nEXPLICACIÓN DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
     if flow_summaries and flow_summaries[0].get("descriptions"):
         summary_text += "\nDESCRIPCIONES DE TABLAS:\n"
         for name in flow_summaries[0]["tables"]:

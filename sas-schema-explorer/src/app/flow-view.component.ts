@@ -86,7 +86,7 @@ export class FlowViewComponent {
   inputText(name: string): string {
     const table = this.state.schema()?.tables.find((t) => t.name === name);
     return table
-      ? `${table.join ?? 'paso SAS'}; descripción automática disponible sin GGUF.`
+      ? `${table.join ?? 'paso SAS'}; descripción generada automáticamente.`
       : '';
   }
 
