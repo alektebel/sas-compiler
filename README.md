@@ -46,6 +46,24 @@ export GGUF_THREADS=4        # opcional
 REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
 ```
 
+Para permitir elegir el modelo desde la interfaz, deja los archivos `.gguf` en
+un directorio local y define `GGUF_MODELS_DIR=/ruta/a/modelos`. La lista no
+expone rutas y el backend solo acepta nombres presentes en ese directorio.
+
+### Despliegue con Docker
+
+La imagen contiene el frontend compilado. Monta los checkouts locales de
+`regllm` y los modelos como solo lectura:
+
+```bash
+docker build -t sas-schema-explorer .
+docker run --rm -p 8000:8000 \
+  -v /ruta/a/regllm:/opt/regllm:ro \
+  -v /ruta/a/modelos:/models:ro \
+  sas-schema-explorer
+# abre http://localhost:8000
+```
+
 El modelo se carga bajo demanda con `llama-cpp-python` y solo recibe los
 nombres de tablas, entradas, operaciones y campos necesarios para describir el
 flujo; el código SAS no se envía a ningún servicio externo. La salida del

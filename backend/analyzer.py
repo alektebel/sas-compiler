@@ -274,7 +274,7 @@ def _build_summary(
 
 
 def _clean_flow_with_gguf(
-    flow: dict, tables: dict[str, dict], warnings: list[str],
+    flow: dict, tables: dict[str, dict], warnings: list[str], model_path: str,
 ) -> dict:
     """Use GGUF only to describe and order the deterministic table set."""
     descriptions = {
@@ -285,7 +285,7 @@ def _clean_flow_with_gguf(
         for name in flow["tables"]
     }
     flow = {**flow, "descriptions": descriptions}
-    model = _load_gguf_model(os.environ.get("GGUF_MODEL_PATH", "").strip())
+    model = _load_gguf_model(model_path)
     if model is None:
         return flow
     context = {
@@ -372,7 +372,7 @@ def _load_gguf_model(path: str):
 
 
 def _resolve_final_tables(
-    tables: dict[str, dict], order: list[str], edges: list[dict], warnings: list[str],
+    tables: dict[str, dict], order: list[str], edges: list[dict], warnings: list[str], model_path: str,
 ) -> list[str]:
     candidates = [name for name in order if tables[name]["role"] == "final"]
     if len(candidates) <= 1:
@@ -381,9 +381,9 @@ def _resolve_final_tables(
     # Deterministic fallback: preserve source order and select the last terminal
     # derived table when no scoped resolver can make a validated decision.
     fallback = candidates[-1]
-    model = _load_gguf_model(os.environ.get("GGUF_MODEL_PATH", "").strip())
+    model = _load_gguf_model(model_path)
     if model is None:
-        if os.environ.get("GGUF_MODEL_PATH"):
+        if model_path:
             warnings.append("No se pudo cargar el modelo GGUF; se usa la tabla final determinista.")
         return [fallback]
 
@@ -475,6 +475,7 @@ def _collect_filters(body, out):
 def analyze(
     programs: list[tuple[str, str]],
     on_progress: Callable[[int, int, str, int], None] | None = None,
+    gguf_model_path: str = "",
 ) -> dict:
     """programs: list of (name, sas_code). Returns the frontend Schema dict."""
     programs = _resolve_project_macros(programs)
@@ -676,19 +677,24 @@ def analyze(
         for t in tables.values()
         for src in t["inputs"]
     ]
-    final_tables = _resolve_final_tables(tables, order, table_edges, warnings)
+    model_path = gguf_model_path or os.environ.get("GGUF_MODEL_PATH", "").strip()
+    final_tables = _resolve_final_tables(tables, order, table_edges, warnings, model_path)
     final_tables, relevant_tables, flow_summaries, summary_text = _build_summary(
         tables, order, table_edges, final_tables,
     )
     flow_summaries = [
-        _clean_flow_with_gguf(flow, tables, warnings) for flow in flow_summaries
+        _clean_flow_with_gguf(flow, tables, warnings, model_path) for flow in flow_summaries
     ]
-    if flow_summaries and flow_summaries[0].get("explanation"):
-        summary_text += "\nEXPLICACIÓN DEL FLUJO:\n  " + flow_summaries[0]["explanation"] + "\n"
-    if flow_summaries and flow_summaries[0].get("descriptions"):
-        summary_text += "\nDESCRIPCIONES DE TABLAS:\n"
-        for name in flow_summaries[0]["tables"]:
-            summary_text += f"  {name}: {flow_summaries[0]['descriptions'][name]}\n"
+    if flow_summaries:
+        flow = flow_summaries[0]
+        summary_lines = ["RESUMEN DEL FLUJO"]
+        if flow["final"]:
+            summary_lines.append(f"Tabla final: {flow['final']}")
+        if flow.get("explanation"):
+            summary_lines.append(flow["explanation"])
+        for name in flow["tables"]:
+            summary_lines.append(f"{name}: {flow['descriptions'][name]}")
+        summary_text = "\n".join(summary_lines) + "\n"
 
     if on_progress:
         on_progress(processed_chars, total_chars, "Calculando linaje de campos", 90)

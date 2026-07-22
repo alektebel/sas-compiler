@@ -137,6 +137,11 @@ header {
 }
 #btn-download:hover { filter: brightness(1.08); }
 #btn-download svg { display: block; }
+.model-select { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; color: var(--ink-3); }
+.model-select select { max-width: 220px; padding: 4px 7px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--bg); color: var(--ink); font: 11.5px var(--mono); }
+.text-result { margin: 14px 22px 0; padding: 11px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow); }
+.text-result h2 { margin: 0 0 5px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.text-result pre { margin: 0; white-space: pre-wrap; font: 12px/1.5 var(--sans); color: var(--ink-2); }
 
 /* ── Pipeline bar ───────────────────────────────────── */
 .pipebar {

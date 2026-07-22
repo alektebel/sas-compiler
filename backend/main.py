@@ -12,11 +12,12 @@ Run:  REGLLM_PATH=/ruta/a/regllm uvicorn backend.main:app --port 8000
 from __future__ import annotations
 
 import json
+import os
 from queue import Queue
 from threading import Thread
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -43,15 +44,41 @@ def _decode(data: bytes) -> str:
         return data.decode("windows-1252", errors="replace")
 
 
+def _gguf_models() -> tuple[Path | None, list[str]]:
+    configured = os.environ.get("GGUF_MODELS_DIR", "").strip()
+    if not configured:
+        return None, []
+    directory = Path(configured).expanduser().resolve()
+    if not directory.is_dir():
+        return directory, []
+    return directory, sorted(path.name for path in directory.glob("*.gguf") if path.is_file())
+
+
+def _selected_gguf_model(name: str) -> str:
+    if not name:
+        return ""
+    directory, models = _gguf_models()
+    if directory is None or name not in models:
+        raise HTTPException(status_code=400, detail="Modelo GGUF no disponible.")
+    return str(directory / name)
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True, "engine": "regllm", "regllm_path": str(REGLLM)}
+
+
+@app.get("/api/gguf-models")
+def gguf_models() -> dict:
+    _, models = _gguf_models()
+    return {"models": models}
 
 
 @app.post("/api/analyze")
 async def analyze_endpoint(
     files: list[UploadFile] = File(default=[]),
     pasted: list[str] = Form(default=[]),
+    gguf_model: str = Form(default=""),
 ) -> JSONResponse:
     programs: list[tuple[str, str]] = []
     warnings: list[str] = []
@@ -73,6 +100,7 @@ async def analyze_endpoint(
     for i, code in enumerate(pasted, 1):
         if code.strip():
             programs.append((f"pegado_{i}.sas", code))
+    model_path = _selected_gguf_model(gguf_model)
 
     def events():
         queue: Queue[dict | None] = Queue()
@@ -88,7 +116,11 @@ async def analyze_endpoint(
 
         def compile_programs() -> None:
             try:
-                result = analyze(programs, on_progress=progress)
+                result = analyze(
+                    programs,
+                    on_progress=progress,
+                    gguf_model_path=model_path,
+                )
                 result["warnings"] = warnings + result.get("warnings", [])
                 result["compiled"] = not result["warnings"]
                 queue.put({"type": "result", "result": result})

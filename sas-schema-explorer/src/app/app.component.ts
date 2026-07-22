@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { StateService, View } from './state.service';
 import { TableViewComponent } from './table-view.component';
 import { FlowViewComponent } from './flow-view.component';
@@ -12,7 +12,7 @@ import { buildReport } from './sas/report';
   imports: [DecimalPipe, TableViewComponent, FlowViewComponent, LineageViewComponent],
   templateUrl: './app.component.html',
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   readonly state = inject(StateService);
   readonly roles = Object.values(ROLES);
   readonly dragOver = signal(false);
@@ -20,6 +20,10 @@ export class AppComponent {
   readonly pasteText = signal('');
   readonly splitName = splitName;
   readonly rolesMap = ROLES;
+
+  ngOnInit(): void {
+    void this.state.loadGgufModels();
+  }
 
   readonly stats = computed(() => {
     const s = this.state.schema();
@@ -68,6 +72,10 @@ export class AppComponent {
 
   onSearch(ev: Event): void {
     this.state.search.set((ev.target as HTMLInputElement).value);
+  }
+
+  onGgufModelChange(ev: Event): void {
+    this.state.setGgufModel((ev.target as HTMLSelectElement).value);
   }
 
   download(): void {

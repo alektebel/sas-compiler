@@ -16,6 +16,17 @@
     </svg>
     Descargar .txt
   </button>
+  @if (state.ggufModels().length) {
+    <label class="model-select">
+      Modelo para resúmenes
+      <select [value]="state.ggufModel()" (change)="onGgufModelChange($event)">
+        <option value="">Determinista (sin modelo)</option>
+        @for (model of state.ggufModels(); track model) {
+          <option [value]="model">{{ model }}</option>
+        }
+      </select>
+    </label>
+  }
 </header>
 
 <div class="loaderbar" [class.dragging]="dragOver()"
@@ -109,6 +120,12 @@
 }
 
 @if (state.schema(); as s) {
+  @if (s.summaryText) {
+    <section class="text-result" aria-label="Resultado resumido">
+      <h2>Resultado</h2>
+      <pre>{{ s.summaryText }}</pre>
+    </section>
+  }
   <div class="shell">
     <aside>
       <input id="search" type="search" placeholder="Filtrar tablas o campos…" autocomplete="off"

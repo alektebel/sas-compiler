@@ -28,6 +28,8 @@ export class StateService {
   readonly analysisTotal = signal(0);
   readonly analysisStage = signal('Preparando programas');
   readonly analysisResult = signal<AnalysisResult>('idle');
+  readonly ggufModels = signal<string[]>([]);
+  readonly ggufModel = signal('');
   readonly view = signal<View>('tabla');
   readonly selectedTable = signal<string | null>(null);
   readonly selectedField = signal<string | null>(null);
@@ -100,6 +102,23 @@ export class StateService {
     this.analysisResult.set('idle');
   }
 
+  async loadGgufModels(): Promise<void> {
+    try {
+      const res = await fetch('api/gguf-models');
+      if (!res.ok) return;
+      const data = await res.json() as { models?: unknown };
+      if (Array.isArray(data.models) && data.models.every((model) => typeof model === 'string')) {
+        this.ggufModels.set(data.models);
+      }
+    } catch {
+      // The local-only frontend works without the optional backend endpoint.
+    }
+  }
+
+  setGgufModel(model: string): void {
+    this.ggufModel.set(model);
+  }
+
   /** Backend first (real regllm compiler); local TS parser as fallback. */
   async analyze(): Promise<void> {
     this.loadError.set(null);
@@ -157,6 +176,7 @@ export class StateService {
       if (f.origin === 'pasted') form.append('pasted', await f.blob.text());
       else form.append('files', f.blob, f.name);
     }
+    if (this.ggufModel()) form.append('gguf_model', this.ggufModel());
     const res = await fetch(API_ANALYZE, { method: 'POST', body: form });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (!res.body) throw new Error('La respuesta no contiene progreso de compilación');
