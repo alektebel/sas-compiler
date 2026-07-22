@@ -307,17 +307,16 @@ def _clean_flow_with_gguf(
         ],
         "edges": flow["edges"],
     }
-    prompt = (
-        "Resume este flujo de datos. Devuelve exactamente JSON con un array "
-        "'tables' que contenga cada tabla suministrada una sola vez y un objeto "
-        "'descriptions' con una única frase breve en español para cada tabla que "
-        "describa qué transformación realiza, usando los detalles de consulta "
-        "suministrados. Incluye "
-        "también una frase corta 'explanation' que explique por qué se crea la "
-        "tabla final y qué incluye de forma diferente. No inventes tablas ni "
-        "datos; usa solo la información suministrada.\n\n"
-        + json.dumps(context, ensure_ascii=True)
-    )
+    instructions = " ".join((
+        "Resume este flujo de datos.",
+        "Devuelve exactamente JSON con un array 'tables' que contenga cada tabla suministrada una sola vez",
+        "y un objeto 'descriptions' con una única frase breve en español para cada tabla que describa",
+        "qué transformación realiza, usando los detalles de consulta suministrados.",
+        "Incluye también una frase corta 'explanation' que explique por qué se crea la tabla final",
+        "y qué incluye de forma diferente.",
+        "No inventes tablas ni datos; usa solo la información suministrada.",
+    ))
+    prompt = instructions + "\n\n" + json.dumps(context, ensure_ascii=True)
     try:
         response = model.create_chat_completion(
             messages=[
