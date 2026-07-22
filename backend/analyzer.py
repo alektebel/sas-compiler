@@ -296,6 +296,12 @@ def _clean_flow_with_gguf(
                 "role": tables[name]["role"],
                 "join": tables[name]["join"],
                 "inputs": tables[name]["inputs"],
+                "by_keys": tables[name]["byKeys"],
+                "filters": tables[name]["filters"],
+                "computed_fields": [
+                    {"name": field["var"], "expression": field["expr"], "conditions": field["conds"]}
+                    for field in tables[name]["newFields"]
+                ],
             }
             for name in flow["tables"]
         ],
@@ -304,7 +310,9 @@ def _clean_flow_with_gguf(
     prompt = (
         "Resume este flujo de datos. Devuelve exactamente JSON con un array "
         "'tables' que contenga cada tabla suministrada una sola vez y un objeto "
-        "'descriptions' con una frase corta en español para cada tabla. Incluye "
+        "'descriptions' con una única frase breve en español para cada tabla que "
+        "describa qué transformación realiza, usando los detalles de consulta "
+        "suministrados. Incluye "
         "también una frase corta 'explanation' que explique por qué se crea la "
         "tabla final y qué incluye de forma diferente. No inventes tablas ni "
         "datos; usa solo la información suministrada.\n\n"
