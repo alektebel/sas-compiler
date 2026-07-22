@@ -25,7 +25,7 @@ export function buildReport(schema: Schema): string {
     for (const name of tables) {
       const table = tableByName.get(name);
       const description = flow.descriptions?.[name]
-        ?? (table?.join ? `Transformación mediante ${table.join}` : 'Transformación SAS');
+        ?? (table ? `Transformación mediante ${table.join ?? 'SAS'}` : 'Tabla no encontrada');
       L.push(`  ${name} ${description}`);
     }
   }
